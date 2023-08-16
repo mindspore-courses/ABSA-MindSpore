@@ -23,7 +23,7 @@ class AOA(nn.Module):
         aspect_indices = inputs[1] # batch_size x seq_len
         ctx_len = torch.sum(text_indices != 0, dim=1)
         asp_len = torch.sum(aspect_indices != 0, dim=1)
-        ctx = self.embed(text_raw_indices) # batch_size x seq_len x embed_dim
+        ctx = self.embed(text_indices) # batch_size x seq_len x embed_dim
         asp = self.embed(aspect_indices) # batch_size x seq_len x embed_dim
         ctx_out, (_, _) = self.ctx_lstm(ctx, ctx_len) #  batch_size x (ctx) seq_len x 2*hidden_dim
         asp_out, (_, _) = self.asp_lstm(asp, asp_len) # batch_size x (asp) seq_len x 2*hidden_dim

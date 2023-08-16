@@ -29,6 +29,7 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 logger.addHandler(logging.StreamHandler(sys.stdout))
 
+os.environ['CURL_CA_BUNDLE'] = ''
 
 class Instructor:
     def __init__(self, opt):
@@ -300,4 +301,5 @@ def main():
 
 
 if __name__ == '__main__':
+    os.environ['CURL_CA_BUNDLE'] = ''
     main()

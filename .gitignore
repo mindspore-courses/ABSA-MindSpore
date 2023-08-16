@@ -3,6 +3,9 @@ __pycache__/
 *.h5
 *log*
 glove*
+state_dict/
+*.txt
+*.zip
 
 # OSX
 #
