@@ -16,9 +16,7 @@ from time import strftime, localtime
 
 from transformers import BertModel
 
-import torch
-import torch.nn as nn
-from torch.utils.data import DataLoader, random_split
+import mindspore
 
 from data_utils import build_tokenizer, build_embedding_matrix, Tokenizer4Bert, ABSADataset
 from models import LSTM, IAN, MemNet, RAM, TD_LSTM, TC_LSTM, Cabasc, ATAE_LSTM, TNet_LF, AOA, MGAN, ASGCN, LCF_BERT
@@ -52,21 +50,12 @@ class Instructor:
 
         self.trainset = ABSADataset(opt.dataset_file['train'], tokenizer)
         self.testset = ABSADataset(opt.dataset_file['test'], tokenizer)
-        assert 0 <= opt.valset_ratio < 1
-        if opt.valset_ratio > 0:
-            valset_len = int(len(self.trainset) * opt.valset_ratio)
-            self.trainset, self.valset = random_split(self.trainset, (len(self.trainset)-valset_len, valset_len))
-        else:
-            self.valset = self.testset
-
-        if opt.device.type == 'cuda':
-            logger.info('cuda memory allocated: {}'.format(torch.cuda.memory_allocated(device=opt.device.index)))
-        self._print_args()
+        self.valset = self.testset
 
     def _print_args(self):
         n_trainable_params, n_nontrainable_params = 0, 0
         for p in self.model.parameters():
-            n_params = torch.prod(torch.tensor(p.shape))
+            n_params = mindspore.ops.prod(mindspore.tensor(p.shape))
             if p.requires_grad:
                 n_trainable_params += n_params
             else:
@@ -85,7 +74,7 @@ class Instructor:
                             self.opt.initializer(p)
                         else:
                             stdv = 1. / math.sqrt(p.shape[0])
-                            torch.nn.init.uniform_(p, a=-stdv, b=stdv)
+                            mindspore.ops.uniform(p, minval=-stdv, maxval=stdv)
 
     def _train(self, criterion, optimizer, train_data_loader, val_data_loader):
         max_val_acc = 0
@@ -112,7 +101,7 @@ class Instructor:
                 loss.backward()
                 optimizer.step()
 
-                n_correct += (torch.argmax(outputs, -1) == targets).sum().item()
+                n_correct += (mindspore.ops.argmax(outputs, -1) == targets).sum().item()
                 n_total += len(outputs)
                 loss_total += loss.item() * len(outputs)
                 if global_step % self.opt.log_step == 0:
@@ -128,7 +117,7 @@ class Instructor:
                 if not os.path.exists('state_dict'):
                     os.mkdir('state_dict')
                 path = 'state_dict/{0}_{1}_val_acc_{2}'.format(self.opt.model_name, self.opt.dataset, round(val_acc, 4))
-                torch.save(self.model.state_dict(), path)
+                mindspore.save_checkpoint(self.model, path)
                 logger.info('>> saved: {}'.format(path))
             if val_f1 > max_val_f1:
                 max_val_f1 = val_f1
@@ -149,33 +138,33 @@ class Instructor:
                 t_targets = t_batch['polarity'].to(self.opt.device)
                 t_outputs = self.model(t_inputs)
 
-                n_correct += (torch.argmax(t_outputs, -1) == t_targets).sum().item()
+                n_correct += (mindspore.ops.argmax(t_outputs, -1) == t_targets).sum().item()
                 n_total += len(t_outputs)
 
                 if t_targets_all is None:
                     t_targets_all = t_targets
                     t_outputs_all = t_outputs
                 else:
-                    t_targets_all = torch.cat((t_targets_all, t_targets), dim=0)
-                    t_outputs_all = torch.cat((t_outputs_all, t_outputs), dim=0)
+                    t_targets_all = mindspore.ops.cat((t_targets_all, t_targets), axis=0)
+                    t_outputs_all = mindspore.ops.cat((t_outputs_all, t_outputs), axis=0)
 
         acc = n_correct / n_total
-        f1 = metrics.f1_score(t_targets_all.cpu(), torch.argmax(t_outputs_all, -1).cpu(), labels=[0, 1, 2], average='macro')
+        f1 = metrics.f1_score(t_targets_all.cpu(), mindspore.ops.argmax(t_outputs_all, -1).cpu(), labels=[0, 1, 2], average='macro')
         return acc, f1
 
     def run(self):
         # Loss and Optimizer
-        criterion = nn.CrossEntropyLoss()
+        criterion = mindspore.nn.CrossEntropyLoss()
         _params = filter(lambda p: p.requires_grad, self.model.parameters())
         optimizer = self.opt.optimizer(_params, lr=self.opt.lr, weight_decay=self.opt.l2reg)
 
-        train_data_loader = DataLoader(dataset=self.trainset, batch_size=self.opt.batch_size, shuffle=True)
-        test_data_loader = DataLoader(dataset=self.testset, batch_size=self.opt.batch_size, shuffle=False)
-        val_data_loader = DataLoader(dataset=self.valset, batch_size=self.opt.batch_size, shuffle=False)
+        train_data_loader = mindspore.dataset.GeneratorDataset(source=self.trainset, shuffle=True)
+        test_data_loader = mindspore.dataset.GeneratorDataset(source=self.testset, shuffle=False)
+        val_data_loader = mindspore.dataset.GeneratorDataset(source=self.valset, shuffle=False)
 
         self._reset_params()
         best_model_path = self._train(criterion, optimizer, train_data_loader, val_data_loader)
-        self.model.load_state_dict(torch.load(best_model_path))
+        mindspore.load_param_into_net(self.model, mindspore.load_checkpoint(best_model_path))
         test_acc, test_f1 = self._evaluate_acc_f1(test_data_loader)
         logger.info('>> test_acc: {:.4f}, test_f1: {:.4f}'.format(test_acc, test_f1))
 
@@ -201,9 +190,9 @@ def main():
     parser.add_argument('--polarities_dim', default=3, type=int)
     parser.add_argument('--hops', default=3, type=int)
     parser.add_argument('--patience', default=5, type=int)
-    parser.add_argument('--device', default=None, type=str, help='e.g. cuda:0')
+    parser.add_argument('--device', default='GPU', type=str, help='e.g. GPU')
+    parser.add_argument('--device_id', default=0, type=str, help='e.g. 5')
     parser.add_argument('--seed', default=1234, type=int, help='set seed for reproducibility')
-    parser.add_argument('--valset_ratio', default=0, type=float, help='set ratio between 0 and 1 for validation support')
     # The following parameters are only valid for the lcf-bert model
     parser.add_argument('--local_context_focus', default='cdm', type=str, help='local context focus mode, cdw or cdm')
     parser.add_argument('--SRD', default=3, type=int, help='semantic-relative-distance, see the paper of LCF-BERT model')
@@ -212,10 +201,6 @@ def main():
     if opt.seed is not None:
         random.seed(opt.seed)
         numpy.random.seed(opt.seed)
-        torch.manual_seed(opt.seed)
-        torch.cuda.manual_seed(opt.seed)
-        torch.backends.cudnn.deterministic = True
-        torch.backends.cudnn.benchmark = False
         os.environ['PYTHONHASHSEED'] = str(opt.seed)
 
     model_classes = {
@@ -272,26 +257,25 @@ def main():
         'lcf_bert': ['concat_bert_indices', 'concat_segments_indices', 'text_bert_indices', 'aspect_bert_indices'],
     }
     initializers = {
-        'xavier_uniform_': torch.nn.init.xavier_uniform_,
-        'xavier_normal_': torch.nn.init.xavier_normal_,
-        'orthogonal_': torch.nn.init.orthogonal_,
+        'xavier_uniform_': mindspore.common.initializer.XavierUniform,
+        'xavier_normal_': mindspore.common.initializer.XavierNormal,
+        'orthogonal_': mindspore.common.initializer.Orthogonal,
     }
     optimizers = {
-        'adadelta': torch.optim.Adadelta,  # default lr=1.0
-        'adagrad': torch.optim.Adagrad,  # default lr=0.01
-        'adam': torch.optim.Adam,  # default lr=0.001
-        'adamax': torch.optim.Adamax,  # default lr=0.002
-        'asgd': torch.optim.ASGD,  # default lr=0.01
-        'rmsprop': torch.optim.RMSprop,  # default lr=0.01
-        'sgd': torch.optim.SGD,
+        'adadelta': mindspore.nn.Adadelta,  # default lr=1.0
+        'adagrad': mindspore.nn.Adagrad,  # default lr=0.01
+        'adam': mindspore.nn.Adam,  # default lr=0.001
+        'adamax': mindspore.nn.AdaMax,  # default lr=0.002
+        'asgd': mindspore.nn.ASGD,  # default lr=0.01
+        'rmsprop': mindspore.nn.RMSProp,  # default lr=0.01
+        'sgd': mindspore.nn.SGD,
     }
     opt.model_class = model_classes[opt.model_name]
     opt.dataset_file = dataset_files[opt.dataset]
     opt.inputs_cols = input_colses[opt.model_name]
     opt.initializer = initializers[opt.initializer]
     opt.optimizer = optimizers[opt.optimizer]
-    opt.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu') \
-        if opt.device is None else torch.device(opt.device)
+    opt.device = 'GPU' if opt.device is None 
 
     log_file = '{}-{}-{}.log'.format(opt.model_name, opt.dataset, strftime("%y%m%d-%H%M", localtime()))
     logger.addHandler(logging.FileHandler(log_file))
@@ -301,5 +285,4 @@ def main():
 
 
 if __name__ == '__main__':
-    os.environ['CURL_CA_BUNDLE'] = ''
     main()
