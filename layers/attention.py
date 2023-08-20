@@ -4,12 +4,13 @@
 # Copyright (C) 2018. All Rights Reserved.
 
 import math
+import mindspore
 import torch
-import torch.nn as nn
+import mindspore.nn as nn
 import torch.nn.functional as F
 
 
-class Attention(nn.Module):
+class Attention(nn.Cell):
     def __init__(self, embed_dim, hidden_dim=None, out_dim=None, n_head=1, score_function='dot_product', dropout=0):
         ''' Attention Mechanism
         :param embed_dim:
@@ -28,14 +29,14 @@ class Attention(nn.Module):
         self.hidden_dim = hidden_dim
         self.n_head = n_head
         self.score_function = score_function
-        self.w_k = nn.Linear(embed_dim, n_head * hidden_dim)
-        self.w_q = nn.Linear(embed_dim, n_head * hidden_dim)
-        self.proj = nn.Linear(n_head * hidden_dim, out_dim)
-        self.dropout = nn.Dropout(dropout)
+        self.w_k = mindspore.nn.Dense(embed_dim, n_head * hidden_dim)
+        self.w_q = mindspore.nn.Dense(embed_dim, n_head * hidden_dim)
+        self.proj = mindspore.nn.Dense(n_head * hidden_dim, out_dim)
+        self.dropout = mindspore.nn.Dropout(dropout)
         if score_function == 'mlp':
-            self.weight = nn.Parameter(torch.Tensor(hidden_dim*2))
+            self.weight = mindspore.Parameter(mindspore.tensor(hidden_dim*2))
         elif self.score_function == 'bi_linear':
-            self.weight = nn.Parameter(torch.Tensor(hidden_dim, hidden_dim))
+            self.weight = mindspore.Parameter(mindspore.tensor(hidden_dim, hidden_dim))
         else:  # dot_product / scaled_dot_product
             self.register_parameter('weight', None)
         self.reset_parameters()
@@ -45,7 +46,7 @@ class Attention(nn.Module):
         if self.weight is not None:
             self.weight.data.uniform_(-stdv, stdv)
 
-    def forward(self, k, q):
+    def construct(self, k, q):
         if len(q.shape) == 2:  # q_len missing
             q = torch.unsqueeze(q, dim=1)
         if len(k.shape) == 2:  # k_len missing
@@ -102,7 +103,7 @@ class NoQueryAttention(Attention):
         stdv = 1. / math.sqrt(self.embed_dim)
         self.q.data.uniform_(-stdv, stdv)
 
-    def forward(self, k, **kwargs):
+    def construct(self, k, **kwargs):
         mb_size = k.shape[0]
         q = self.q.expand(mb_size, -1, -1)
         return super(NoQueryAttention, self).forward(k, q)

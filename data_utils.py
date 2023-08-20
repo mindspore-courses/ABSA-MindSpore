@@ -6,8 +6,6 @@
 import os
 import pickle
 import numpy as np
-import torch
-from torch.utils.data import Dataset
 from transformers import BertTokenizer
 
 
@@ -124,7 +122,7 @@ class Tokenizer4Bert:
         return pad_and_truncate(sequence, self.max_seq_len, padding=padding, truncating=truncating)
 
 
-class ABSADataset(Dataset):
+class ABSADataset:
     def __init__(self, fname, tokenizer):
         fin = open(fname, 'r', encoding='utf-8', newline='\n', errors='ignore')
         lines = fin.readlines()
