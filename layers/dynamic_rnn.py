@@ -5,7 +5,7 @@
 
 import mindspore
 import numpy as np
-import p_sequence
+from layers.p_sequence import pack_padded_sequence, pad_packed_sequence
 
 class DynamicLSTM(mindspore.nn.Cell):
     def __init__(self, input_size, hidden_size, num_layers=1, bias=True, batch_first=True, dropout=0,

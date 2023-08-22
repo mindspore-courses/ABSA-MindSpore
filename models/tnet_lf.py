@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy
 from layers.dynamic_rnn import DynamicLSTM
-
+import mindspore
 
 class Absolute_Position_Embedding(mindspore.nn.Cell):
     def __init__(self, opt, size=None, mode='sum'):

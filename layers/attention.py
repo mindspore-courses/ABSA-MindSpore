@@ -37,12 +37,6 @@ class Attention(nn.Cell):
             self.weight = mindspore.Parameter(mindspore.tensor(hidden_dim, hidden_dim))
         else:  # dot_product / scaled_dot_product
             self.register_parameter('weight', None)
-        self.reset_parameters()
-
-    def reset_parameters(self):
-        stdv = 1. / math.sqrt(self.hidden_dim)
-        if self.weight is not None:
-            self.weight.data.uniform_(-stdv, stdv)
 
     def construct(self, k, q):
         if len(q.shape) == 2:  # q_len missing

@@ -8,6 +8,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from layers.dynamic_rnn import DynamicLSTM
+from mindspore import Tensor
 import mindspore
 
 class GraphConvolution(mindspore.nn.Cell):
@@ -18,9 +19,9 @@ class GraphConvolution(mindspore.nn.Cell):
         super(GraphConvolution, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
-        self.weight = nn.Parameter(torch.FloatTensor(in_features, out_features))
+        self.weight = mindspore.Parameter(Tensor(np.array(in_features, out_features), mindspore.float32))
         if bias:
-            self.bias = nn.Parameter(torch.FloatTensor(out_features))
+            self.bias = mindspore.Parameter(Tensor(np.array(out_features), mindspore.float32))
         else:
             self.register_parameter('bias', None)
 
@@ -37,7 +38,7 @@ class ASGCN(mindspore.nn.Cell):
     def __init__(self, embedding_matrix, opt):
         super(ASGCN, self).__init__()
         self.opt = opt
-        self.embed = nn.Embedding.from_pretrained(mindspore.tensor(embedding_matrix, dtype=ms.float32))
+        self.embed = mindspore.nn.Embedding(mindspore.tensor(embedding_matrix, dtype=ms.float32))
         self.text_lstm = DynamicLSTM(opt.embed_dim, opt.hidden_dim, num_layers=1, batch_first=True, bidirectional=True)
         self.gc1 = GraphConvolution(2*opt.hidden_dim, 2*opt.hidden_dim)
         self.gc2 = GraphConvolution(2*opt.hidden_dim, 2*opt.hidden_dim)

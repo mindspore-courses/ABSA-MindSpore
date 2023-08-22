@@ -27,8 +27,6 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 logger.addHandler(logging.StreamHandler(sys.stdout))
 
-os.environ['CURL_CA_BUNDLE'] = ''
-
 class Instructor:
     def __init__(self, opt):
         self.opt = opt
@@ -36,7 +34,7 @@ class Instructor:
         if 'bert' in opt.model_name:
             tokenizer = Tokenizer4Bert(opt.max_seq_len, opt.pretrained_bert_name)
             bert = BertModel.from_pretrained(opt.pretrained_bert_name, return_dict=False)
-            self.model = opt.model_class(bert, opt).to(opt.device)
+            self.model = opt.model_class(bert, opt)
         else:
             tokenizer = build_tokenizer(
                 fnames=[opt.dataset_file['train'], opt.dataset_file['test']],
@@ -46,7 +44,7 @@ class Instructor:
                 word2idx=tokenizer.word2idx,
                 embed_dim=opt.embed_dim,
                 dat_fname='{0}_{1}_embedding_matrix.dat'.format(str(opt.embed_dim), opt.dataset))
-            self.model = opt.model_class(embedding_matrix, opt).to(opt.device)
+            self.model = opt.model_class(embedding_matrix, opt)
 
         self.trainset = ABSADataset(opt.dataset_file['train'], tokenizer)
         self.testset = ABSADataset(opt.dataset_file['test'], tokenizer)
@@ -132,21 +130,20 @@ class Instructor:
         t_targets_all, t_outputs_all = None, None
         # switch model to evaluation mode
         self.model.eval()
-        with torch.no_grad():
-            for i_batch, t_batch in enumerate(data_loader):
-                t_inputs = [t_batch[col].to(self.opt.device) for col in self.opt.inputs_cols]
-                t_targets = t_batch['polarity'].to(self.opt.device)
-                t_outputs = self.model(t_inputs)
+        for i_batch, t_batch in enumerate(data_loader):
+            t_inputs = [t_batch[col].to(self.opt.device) for col in self.opt.inputs_cols]
+            t_targets = t_batch['polarity'].to(self.opt.device)
+            t_outputs = self.model(t_inputs)
 
-                n_correct += (mindspore.ops.argmax(t_outputs, -1) == t_targets).sum().item()
-                n_total += len(t_outputs)
+            n_correct += (mindspore.ops.argmax(t_outputs, -1) == t_targets).sum().item()
+            n_total += len(t_outputs)
 
-                if t_targets_all is None:
-                    t_targets_all = t_targets
-                    t_outputs_all = t_outputs
-                else:
-                    t_targets_all = mindspore.ops.cat((t_targets_all, t_targets), axis=0)
-                    t_outputs_all = mindspore.ops.cat((t_outputs_all, t_outputs), axis=0)
+            if t_targets_all is None:
+                t_targets_all = t_targets
+                t_outputs_all = t_outputs
+            else:
+                t_targets_all = mindspore.ops.cat((t_targets_all, t_targets), axis=0)
+                t_outputs_all = mindspore.ops.cat((t_outputs_all, t_outputs), axis=0)
 
         acc = n_correct / n_total
         f1 = metrics.f1_score(t_targets_all.cpu(), mindspore.ops.argmax(t_outputs_all, -1).cpu(), labels=[0, 1, 2], average='macro')
@@ -275,7 +272,6 @@ def main():
     opt.inputs_cols = input_colses[opt.model_name]
     opt.initializer = initializers[opt.initializer]
     opt.optimizer = optimizers[opt.optimizer]
-    opt.device = 'GPU' if opt.device is None 
 
     log_file = '{}-{}-{}.log'.format(opt.model_name, opt.dataset, strftime("%y%m%d-%H%M", localtime()))
     logger.addHandler(logging.FileHandler(log_file))

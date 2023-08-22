@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 import mindspore
 
-class LSTM(mindspore.nn.Celle):
+class LSTM(mindspore.nn.Cell):
     def __init__(self, embedding_matrix, opt):
         super(LSTM, self).__init__()
         self.embed = nn.Embedding.from_pretrained(mindspore.tensor(embedding_matrix, dtype=ms.float32))

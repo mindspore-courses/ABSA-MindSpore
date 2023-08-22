@@ -5,9 +5,9 @@
 
 import mindspore
 import numpy as np
-import p_sequence
+from layers.p_sequence import pack_padded_sequence, pad_packed_sequence
 
-class SqueezeEmbedding(nn.Module):
+class SqueezeEmbedding(mindspore.nn.Cell):
     """
     Squeeze sequence embedding length to the longest one in the batch
     """
@@ -15,7 +15,7 @@ class SqueezeEmbedding(nn.Module):
         super(SqueezeEmbedding, self).__init__()
         self.batch_first = batch_first
 
-    def forward(self, x, x_len):
+    def construct(self, x, x_len):
         """
         sequence -> sort -> pad and pack -> unpack ->unsort
         :param x: sequence embedding vectors
