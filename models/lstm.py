@@ -8,17 +8,17 @@ import torch
 import torch.nn as nn
 import mindspore
 
-class LSTM(nn.Module):
+class LSTM(mindspore.nn.Celle):
     def __init__(self, embedding_matrix, opt):
         super(LSTM, self).__init__()
-        self.embed = nn.Embedding.from_pretrained(torch.tensor(embedding_matrix, dtype=torch.float))
+        self.embed = nn.Embedding.from_pretrained(mindspore.tensor(embedding_matrix, dtype=ms.float32))
         self.lstm = DynamicLSTM(opt.embed_dim, opt.hidden_dim, num_layers=1, batch_first=True)
-        self.dense = nn.Linear(opt.hidden_dim, opt.polarities_dim)
+        self.dense = mindspore.nn.Dense(opt.hidden_dim, opt.polarities_dim)
 
-    def forward(self, inputs):
+    def construct(self, inputs):
         text_raw_indices = inputs[0]
         x = self.embed(text_raw_indices)
-        x_len = torch.sum(text_raw_indices != 0, dim=-1)
+        x_len = mindspore.ops.sum(text_raw_indices != 0, dim=-1)
         _, (h_n, _) = self.lstm(x, x_len)
         out = self.dense(h_n[0])
         return out

@@ -9,7 +9,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import mindspore
 
-class RAM(nn.Module):
+class RAM(mindspore.nn.Cell):
     def locationed_memory(self, memory, memory_len, left_len, aspect_len):
         batch_size = memory.shape[0]
         seq_len = memory.shape[1]
@@ -31,26 +31,26 @@ class RAM(nn.Module):
             for idx in range(memory_len[i], seq_len):
                 weight[i].append(1)
                 u[i].append(0)
-        u = torch.tensor(u, dtype=memory.dtype).to(self.opt.device).unsqueeze(2)
-        weight = torch.tensor(weight).to(self.opt.device).unsqueeze(2)
+        u = mindspore.tensor(u, dtype=memory.dtype).unsqueeze(2)
+        weight = mindspore.tensor(weight).unsqueeze(2)
         v = memory*weight
-        memory = torch.cat([v, u], dim=2)
+        memory = mindspore.ops.cat([v, u], dim=2)
         return memory
 
     def __init__(self, embedding_matrix, opt):
         super(RAM, self).__init__()
         self.opt = opt
-        self.embed = nn.Embedding.from_pretrained(torch.tensor(embedding_matrix, dtype=torch.float))
+        self.embed = nn.Embedding.from_pretrained(mindspore.tensor(embedding_matrix, dtype=ms.float32))
         self.bi_lstm_context = DynamicLSTM(opt.embed_dim, opt.hidden_dim, num_layers=1, batch_first=True, bidirectional=True)
-        self.att_linear = nn.Linear(opt.hidden_dim*2 + 1 + opt.embed_dim*2, 1)
+        self.att_linear = mindspore.nn.Dense(opt.hidden_dim*2 + 1 + opt.embed_dim*2, 1)
         self.gru_cell = nn.GRUCell(opt.hidden_dim*2 + 1, opt.embed_dim)
-        self.dense = nn.Linear(opt.embed_dim, opt.polarities_dim)
+        self.dense = mindspore.nn.Dense(opt.embed_dim, opt.polarities_dim)
 
-    def forward(self, inputs):
+    def construct(self, inputs):
         text_raw_indices, aspect_indices, text_left_indices = inputs[0], inputs[1], inputs[2]
-        left_len = torch.sum(text_left_indices != 0, dim=-1)
-        memory_len = torch.sum(text_raw_indices != 0, dim=-1)
-        aspect_len = torch.sum(aspect_indices != 0, dim=-1)
+        left_len = mindspore.ops.sum(text_left_indices != 0, dim=-1)
+        memory_len = mindspore.ops.sum(text_raw_indices != 0, dim=-1)
+        aspect_len = mindspore.ops.sum(aspect_indices != 0, dim=-1)
         nonzeros_aspect = aspect_len.float()
 
         memory = self.embed(text_raw_indices)
@@ -58,18 +58,18 @@ class RAM(nn.Module):
         memory = self.locationed_memory(memory, memory_len, left_len, aspect_len)
         
         aspect = self.embed(aspect_indices)
-        aspect = torch.sum(aspect, dim=1)
-        aspect = torch.div(aspect, nonzeros_aspect.unsqueeze(-1))
-        et = torch.zeros_like(aspect).to(self.opt.device)
+        aspect = mindspore.ops.sum(aspect, dim=1)
+        aspect = mindspore.ops.div(aspect, nonzeros_aspect.unsqueeze(-1))
+        et = torch.zeros_like(aspect)
 
         batch_size = memory.size(0)
         seq_len = memory.size(1)
         for _ in range(self.opt.hops):
-            g = self.att_linear(torch.cat([memory, 
-                torch.zeros(batch_size, seq_len, self.opt.embed_dim).to(self.opt.device) + et.unsqueeze(1), 
-                torch.zeros(batch_size, seq_len, self.opt.embed_dim).to(self.opt.device) + aspect.unsqueeze(1)], 
+            g = self.att_linear(mindspore.ops.cat([memory, 
+                mindspore.ops.zeros(batch_size, seq_len, self.opt.embed_dim) + et.unsqueeze(1), 
+                mindspore.ops.zeros(batch_size, seq_len, self.opt.embed_dim) + aspect.unsqueeze(1)], 
                 dim=-1))
-            alpha = F.softmax(g, dim=1)
+            alpha = mindspore.ops.softmax(g, axis=1)
             i = torch.bmm(alpha.transpose(1, 2), memory).squeeze(1)  
             et = self.gru_cell(i, et)
         out = self.dense(et)
