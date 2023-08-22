@@ -7,6 +7,7 @@ from layers.dynamic_rnn import DynamicLSTM
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import mindspore
 
 class LocationEncoding(nn.Module):
     def __init__(self, opt):

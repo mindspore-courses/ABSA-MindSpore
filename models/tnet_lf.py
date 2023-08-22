@@ -49,7 +49,7 @@ class TNet_LF(nn.Module):
         HD = opt.hidden_dim
         self.lstm1 = DynamicLSTM(opt.embed_dim, opt.hidden_dim, num_layers=1, batch_first=True, bidirectional=True)
         self.lstm2 = DynamicLSTM(opt.embed_dim, opt.hidden_dim, num_layers=1, batch_first=True, bidirectional=True)
-        self.convs3 = nn.Conv1d(2 * HD, 50, 3, padding=1)
+        self.convs3 = mindspore.nn.Conv1d(2 * HD, 50, 3, padding=1)
         self.fc1 = nn.Linear(4 * HD, 2 * HD)
         self.fc = nn.Linear(50, C)
 

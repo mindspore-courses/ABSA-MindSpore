@@ -7,6 +7,7 @@ from layers.dynamic_rnn import DynamicLSTM
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import mindspore
 
 class RAM(nn.Module):
     def locationed_memory(self, memory, memory_len, left_len, aspect_len):

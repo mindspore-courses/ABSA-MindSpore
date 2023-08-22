@@ -7,7 +7,7 @@ from layers.dynamic_rnn import DynamicLSTM
 from layers.attention import Attention
 import torch
 import torch.nn as nn
-
+import mindspore
 
 class IAN(nn.Module):
     def __init__(self, embedding_matrix, opt):

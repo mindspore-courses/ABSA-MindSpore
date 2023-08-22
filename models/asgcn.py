@@ -8,6 +8,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from layers.dynamic_rnn import DynamicLSTM
+import mindspore
 
 class GraphConvolution(nn.Module):
     """
@@ -41,7 +42,7 @@ class ASGCN(nn.Module):
         self.gc1 = GraphConvolution(2*opt.hidden_dim, 2*opt.hidden_dim)
         self.gc2 = GraphConvolution(2*opt.hidden_dim, 2*opt.hidden_dim)
         self.fc = nn.Linear(2*opt.hidden_dim, opt.polarities_dim)
-        self.text_embed_dropout = nn.Dropout(0.3)
+        self.text_embed_dropout = mindspore.nn.Dropout(0.3)
 
     def position_weight(self, x, aspect_double_idx, text_len, aspect_len):
         batch_size = x.shape[0]

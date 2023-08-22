@@ -3,10 +3,9 @@
 # author: songyouwei <youwei0314@gmail.com>
 # Copyright (C) 2018. All Rights Reserved.
 
-
-import torch
-import torch.nn as nn
+import mindspore
 import numpy as np
+import p_sequence
 
 class SqueezeEmbedding(nn.Module):
     """
@@ -24,14 +23,14 @@ class SqueezeEmbedding(nn.Module):
         :return:
         """
         """sort"""
-        x_sort_idx = torch.sort(-x_len)[1].long()
-        x_unsort_idx = torch.sort(x_sort_idx)[1].long()
+        x_sort_idx = mindspore.ops.sort(-x_len)[1].long()
+        x_unsort_idx = mindspore.ops.sort(x_sort_idx)[1].long()
         x_len = x_len[x_sort_idx]
         x = x[x_sort_idx]
         """pack"""
-        x_emb_p = torch.nn.utils.rnn.pack_padded_sequence(x, x_len.cpu(), batch_first=self.batch_first)
+        x_emb_p = pack_padded_sequence(x, x_len.cpu(), batch_first=self.batch_first)
         """unpack: out"""
-        out = torch.nn.utils.rnn.pad_packed_sequence(x_emb_p, batch_first=self.batch_first)  # (sequence, lengths)
+        out = pad_packed_sequence(x_emb_p, batch_first=self.batch_first)  # (sequence, lengths)
         out = out[0]  #
         """unsort"""
         out = out[x_unsort_idx]

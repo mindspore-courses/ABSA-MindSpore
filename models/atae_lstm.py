@@ -6,7 +6,7 @@ from layers.attention import Attention, NoQueryAttention
 from layers.dynamic_rnn import DynamicLSTM
 import torch
 import torch.nn as nn
-
+import mindspore
 from layers.squeeze_embedding import SqueezeEmbedding
 
 

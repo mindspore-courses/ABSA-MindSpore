@@ -10,6 +10,7 @@ from layers.point_wise_feed_forward import PositionwiseFeedForward
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import mindspore
 
 # CrossEntropyLoss for Label Smoothing Regularization
 class CrossEntropyLoss_LSR(nn.Module):
@@ -89,7 +90,7 @@ class AEN_BERT(nn.Module):
         self.opt = opt
         self.bert = bert
         self.squeeze_embedding = SqueezeEmbedding()
-        self.dropout = nn.Dropout(opt.dropout)
+        self.dropout = mindspore.nn.Dropout(opt.dropout)
 
         self.attn_k = Attention(opt.bert_dim, out_dim=opt.hidden_dim, n_head=8, score_function='mlp', dropout=opt.dropout)
         self.attn_q = Attention(opt.bert_dim, out_dim=opt.hidden_dim, n_head=8, score_function='mlp', dropout=opt.dropout)

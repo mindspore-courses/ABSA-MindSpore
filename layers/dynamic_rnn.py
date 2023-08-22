@@ -3,12 +3,11 @@
 # author: songyouwei <youwei0314@gmail.com>
 # Copyright (C) 2018. All Rights Reserved.
 
-
-import torch
-import torch.nn as nn
+import mindspore
 import numpy as np
+import p_sequence
 
-class DynamicLSTM(nn.Module):
+class DynamicLSTM(mindspore.nn.Cell):
     def __init__(self, input_size, hidden_size, num_layers=1, bias=True, batch_first=True, dropout=0,
                  bidirectional=False, only_use_last_hidden_state=False, rnn_type = 'LSTM'):
         """
@@ -35,20 +34,20 @@ class DynamicLSTM(nn.Module):
         self.rnn_type = rnn_type
         
         if self.rnn_type == 'LSTM': 
-            self.RNN = nn.LSTM(
+            self.RNN = mindspore.nn.LSTM(
                 input_size=input_size, hidden_size=hidden_size, num_layers=num_layers,
-                bias=bias, batch_first=batch_first, dropout=dropout, bidirectional=bidirectional)  
+                has_bias=bias, batch_first=batch_first, dropout=dropout, bidirectional=bidirectional)  
         elif self.rnn_type == 'GRU':
-            self.RNN = nn.GRU(
+            self.RNN = mindspore.nn.GRU(
                 input_size=input_size, hidden_size=hidden_size, num_layers=num_layers,
-                bias=bias, batch_first=batch_first, dropout=dropout, bidirectional=bidirectional)
+                has_bias=bias, batch_first=batch_first, dropout=dropout, bidirectional=bidirectional)
         elif self.rnn_type == 'RNN':
-            self.RNN = nn.RNN(
+            self.RNN = mindspore.nn.RNN(
                 input_size=input_size, hidden_size=hidden_size, num_layers=num_layers,
-                bias=bias, batch_first=batch_first, dropout=dropout, bidirectional=bidirectional)
+                has_bias=bias, batch_first=batch_first, dropout=dropout, bidirectional=bidirectional)
         
 
-    def forward(self, x, x_len):
+    def construct(self, x, x_len):
         """
         sequence -> sort -> pad and pack ->process using RNN -> unpack ->unsort
 
@@ -57,12 +56,12 @@ class DynamicLSTM(nn.Module):
         :return:
         """
         """sort"""
-        x_sort_idx = torch.sort(-x_len)[1].long()
-        x_unsort_idx = torch.sort(x_sort_idx)[1].long()
+        x_sort_idx = mindspore.ops.sort(-x_len)[1].long()
+        x_unsort_idx = mindspore.ops.sort(x_sort_idx)[1].long()
         x_len = x_len[x_sort_idx]
         x = x[x_sort_idx]
         """pack"""
-        x_emb_p = torch.nn.utils.rnn.pack_padded_sequence(x, x_len.to('cpu'), batch_first=self.batch_first)
+        x_emb_p = pack_padded_sequence(x, x_len, batch_first=self.batch_first)
         
         # process using the selected RNN
         if self.rnn_type == 'LSTM': 
@@ -71,21 +70,21 @@ class DynamicLSTM(nn.Module):
             out_pack, ht = self.RNN(x_emb_p, None)
             ct = None
         """unsort: h"""
-        ht = torch.transpose(ht, 0, 1)[
+        ht = mindspore.ops.swapaxes(ht, 0, 1)[
             x_unsort_idx]  # (num_layers * num_directions, batch, hidden_size) -> (batch, ...)
-        ht = torch.transpose(ht, 0, 1)
+        ht = mindspore.ops.swapaxes(ht, 0, 1)
 
         if self.only_use_last_hidden_state:
             return ht
         else:
             """unpack: out"""
-            out = torch.nn.utils.rnn.pad_packed_sequence(out_pack, batch_first=self.batch_first)  # (sequence, lengths)
+            out = pad_packed_sequence(out_pack, batch_first=self.batch_first)  # (sequence, lengths)
             out = out[0]  #
             out = out[x_unsort_idx]
             """unsort: out c"""
             if self.rnn_type =='LSTM':
-                ct = torch.transpose(ct, 0, 1)[
+                ct = mindspore.ops.swapaxes(ct, 0, 1)[
                     x_unsort_idx]  # (num_layers * num_directions, batch, hidden_size) -> (batch, ...)
-                ct = torch.transpose(ct, 0, 1)
+                ct = mindspore.ops.swapaxes(ct, 0, 1)
 
             return out, (ht, ct)

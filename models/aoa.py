@@ -8,6 +8,7 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import mindspore
 
 class AOA(nn.Module):
     def __init__(self, embedding_matrix, opt):
@@ -27,12 +28,12 @@ class AOA(nn.Module):
         asp = self.embed(aspect_indices) # batch_size x seq_len x embed_dim
         ctx_out, (_, _) = self.ctx_lstm(ctx, ctx_len) #  batch_size x (ctx) seq_len x 2*hidden_dim
         asp_out, (_, _) = self.asp_lstm(asp, asp_len) # batch_size x (asp) seq_len x 2*hidden_dim
-        interaction_mat = torch.matmul(ctx_out, torch.transpose(asp_out, 1, 2)) # batch_size x (ctx) seq_len x (asp) seq_len
+        interaction_mat = torch.matmul(ctx_out, mindspore.ops.swapaxes(asp_out, 1, 2)) # batch_size x (ctx) seq_len x (asp) seq_len
         alpha = F.softmax(interaction_mat, dim=1) # col-wise, batch_size x (ctx) seq_len x (asp) seq_len
         beta = F.softmax(interaction_mat, dim=2) # row-wise, batch_size x (ctx) seq_len x (asp) seq_len
         beta_avg = beta.mean(dim=1, keepdim=True) # batch_size x 1 x (asp) seq_len
         gamma = torch.matmul(alpha, beta_avg.transpose(1, 2)) # batch_size x (ctx) seq_len x 1
-        weighted_sum = torch.matmul(torch.transpose(ctx_out, 1, 2), gamma).squeeze(-1) # batch_size x 2*hidden_dim
+        weighted_sum = torch.matmul(mindspore.ops.swapaxes(ctx_out, 1, 2), gamma).squeeze(-1) # batch_size x 2*hidden_dim
         out = self.dense(weighted_sum) # batch_size x polarity_dim
 
         return out

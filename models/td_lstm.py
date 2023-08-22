@@ -6,7 +6,7 @@
 from layers.dynamic_rnn import DynamicLSTM
 import torch
 import torch.nn as nn
-
+import mindspore
 
 class TD_LSTM(nn.Module):
     def __init__(self, embedding_matrix, opt):

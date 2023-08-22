@@ -11,7 +11,7 @@ import torch
 import torch.nn as nn
 import copy
 import numpy as np
-
+import mindspore
 from transformers.models.bert.modeling_bert import BertPooler, BertSelfAttention
 
 
@@ -37,7 +37,7 @@ class LCF_BERT(nn.Module):
         self.opt = opt
         # self.bert_local = copy.deepcopy(bert)  # Uncomment the line to use dual Bert
         self.bert_local = bert   # Default to use single Bert and reduce memory requirements
-        self.dropout = nn.Dropout(opt.dropout)
+        self.dropout = mindspore.nn.Dropout(opt.dropout)
         self.bert_SA = SelfAttention(bert.config, opt)
         self.linear_double = nn.Linear(opt.bert_dim * 2, opt.bert_dim)
         self.linear_single = nn.Linear(opt.bert_dim, opt.bert_dim)

@@ -5,9 +5,7 @@
 
 import math
 import mindspore
-import torch
 import mindspore.nn as nn
-import torch.nn.functional as F
 
 
 class Attention(nn.Cell):
@@ -48,9 +46,9 @@ class Attention(nn.Cell):
 
     def construct(self, k, q):
         if len(q.shape) == 2:  # q_len missing
-            q = torch.unsqueeze(q, dim=1)
+            q = mindspore.ops.unsqueeze(q, dim=1)
         if len(k.shape) == 2:  # k_len missing
-            k = torch.unsqueeze(k, dim=1)
+            k = mindspore.ops.unsqueeze(k, dim=1)
         mb_size = k.shape[0]  # ?
         k_len = k.shape[1]
         q_len = q.shape[1]
@@ -66,26 +64,25 @@ class Attention(nn.Cell):
         qx = qx.permute(2, 0, 1, 3).contiguous().view(-1, q_len, self.hidden_dim)
         if self.score_function == 'dot_product':
             kt = kx.permute(0, 2, 1)
-            score = torch.bmm(qx, kt)
+            score = mindspore.ops.bmm(qx, kt)
         elif self.score_function == 'scaled_dot_product':
             kt = kx.permute(0, 2, 1)
-            qkt = torch.bmm(qx, kt)
-            score = torch.div(qkt, math.sqrt(self.hidden_dim))
+            qkt = mindspore.ops.bmm(qx, kt)
+            score = mindspore.ops.div(qkt, math.sqrt(self.hidden_dim))
         elif self.score_function == 'mlp':
-            kxx = torch.unsqueeze(kx, dim=1).expand(-1, q_len, -1, -1)
-            qxx = torch.unsqueeze(qx, dim=2).expand(-1, -1, k_len, -1)
-            kq = torch.cat((kxx, qxx), dim=-1)  # (n_head*?, q_len, k_len, hidden_dim*2)
-            # kq = torch.unsqueeze(kx, dim=1) + torch.unsqueeze(qx, dim=2)
-            score = F.tanh(torch.matmul(kq, self.weight))
+            kxx = mindspore.ops.unsqueeze(kx, dim=1).expand(-1, q_len, -1, -1)
+            qxx = mindspore.ops.unsqueeze(qx, dim=2).expand(-1, -1, k_len, -1)
+            kq = mindspore.ops.cat((kxx, qxx), axis=-1)  # (n_head*?, q_len, k_len, hidden_dim*2)
+            score = mindspore.ops.tanh(mindspore.ops.matmul(kq, self.weight))
         elif self.score_function == 'bi_linear':
-            qw = torch.matmul(qx, self.weight)
+            qw = mindspore.ops.matmul(qx, self.weight)
             kt = kx.permute(0, 2, 1)
-            score = torch.bmm(qw, kt)
+            score = mindspore.ops.bmm(qw, kt)
         else:
             raise RuntimeError('invalid score_function')
-        score = F.softmax(score, dim=-1)
-        output = torch.bmm(score, kx)  # (n_head*?, q_len, hidden_dim)
-        output = torch.cat(torch.split(output, mb_size, dim=0), dim=-1)  # (?, q_len, n_head*hidden_dim)
+        score = mindspore.ops.softmax(score, axis=-1)
+        output = mindspore.ops.bmm(score, kx)  # (n_head*?, q_len, hidden_dim)
+        output = mindspore.ops.cat(mindspore.ops.split(output, mb_size, axis=0), dim=-1)  # (?, q_len, n_head*hidden_dim)
         output = self.proj(output)  # (?, q_len, out_dim)
         output = self.dropout(output)
         return output, score
@@ -96,7 +93,7 @@ class NoQueryAttention(Attention):
     def __init__(self, embed_dim, hidden_dim=None, out_dim=None, n_head=1, score_function='dot_product', q_len=1, dropout=0):
         super(NoQueryAttention, self).__init__(embed_dim, hidden_dim, out_dim, n_head, score_function, dropout)
         self.q_len = q_len
-        self.q = nn.Parameter(torch.Tensor(q_len, embed_dim))
+        self.q = nn.Parameter(mindspore.tensor(q_len, embed_dim))
         self.reset_q()
 
     def reset_q(self):
