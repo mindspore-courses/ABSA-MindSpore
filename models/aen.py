@@ -42,7 +42,7 @@ class AEN_BERT(mindspore.nn.Cell):
         self.opt = opt
         self.bert = bert
         self.squeeze_embedding = SqueezeEmbedding()
-        self.dropout = mindspore.nn.Dropout(opt.dropout)
+        self.dropout = mindspore.nn.Dropout(p=opt.dropout)
 
         self.attn_k = Attention(opt.bert_dim, out_dim=opt.hidden_dim, n_head=8, score_function='mlp', dropout=opt.dropout)
         self.attn_q = Attention(opt.bert_dim, out_dim=opt.hidden_dim, n_head=8, score_function='mlp', dropout=opt.dropout)

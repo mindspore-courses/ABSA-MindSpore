@@ -11,7 +11,7 @@ class AOA(mindspore.nn.Cell):
     def __init__(self, embedding_matrix, opt):
         super(AOA, self).__init__()
         self.opt = opt
-        self.embed = mindspore.nn.Embedding(vocab_size=mindspore.tensor(embedding_matrix, dtype=ms.float32).shape[0], embedding_size=mindspore.tensor(embedding_matrix, dtype=ms.float32).shape[0].shape[1])
+        self.embed = mindspore.nn.Embedding(vocab_size=mindspore.tensor(embedding_matrix, dtype=mindspore.float32).shape[0], embedding_size=mindspore.tensor(embedding_matrix, dtype=mindspore.float32).shape[1])
         self.ctx_lstm = DynamicLSTM(opt.embed_dim, opt.hidden_dim, num_layers=1, batch_first=True, bidirectional=True)
         self.asp_lstm = DynamicLSTM(opt.embed_dim, opt.hidden_dim, num_layers=1, batch_first=True, bidirectional=True)
         self.dense = mindspore.nn.Dense(2 * opt.hidden_dim, opt.polarities_dim)

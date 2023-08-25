@@ -19,6 +19,7 @@ from transformers import BertModel
 import mindspore
 import mindspore.nn as nn
 from mindspore.dataset import GeneratorDataset
+from mindspore import context
 
 from data_utils import build_tokenizer, build_embedding_matrix, Tokenizer4Bert, ABSADataset
 from models import LSTM, IAN, MemNet, RAM, TD_LSTM, TC_LSTM, Cabasc, ATAE_LSTM, TNet_LF, AOA, MGAN, ASGCN, LCF_BERT
@@ -53,9 +54,10 @@ class Instructor:
         self.valset = self.testset
 
     def _reset_params(self):
-        for child in self.model.cells_and_names():
+        for child in self.model.cells():
             if type(child) != BertModel:  # skip bert params
                 for p in child.get_parameters():
+                    print(p)
                     if p.requires_grad:
                         if len(p.shape) > 1:
                             self.opt.initializer(p)
@@ -79,16 +81,12 @@ class Instructor:
 
             for i_batch, batch in enumerate(train_data_loader):
                 global_step += 1
-                # clear gradient accumulators
-                optimizer.zero_grad()
 
                 inputs = [batch[col] for col in self.opt.inputs_cols]
                 outputs = self.model(inputs)
                 targets = batch['polarity']
 
-                loss = criterion(outputs, targets)
-                loss.backward()
-                optimizer.step()
+                loss = train_network(outputs, targets)
 
                 n_correct += (mindspore.ops.argmax(outputs, -1) == targets).sum().item()
                 n_total += len(outputs)
@@ -122,8 +120,8 @@ class Instructor:
         # switch model to evaluation mode
         self.model.eval()
         for i_batch, t_batch in enumerate(data_loader):
-            t_inputs = [t_batch[col].to(self.opt.device) for col in self.opt.inputs_cols]
-            t_targets = t_batch['polarity'].to(self.opt.device)
+            t_inputs = [t_batch[col] for col in self.opt.inputs_cols]
+            t_targets = t_batch['polarity']
             t_outputs = self.model(t_inputs)
 
             n_correct += (mindspore.ops.argmax(t_outputs, -1) == t_targets).sum().item()
@@ -137,19 +135,19 @@ class Instructor:
                 t_outputs_all = mindspore.ops.cat((t_outputs_all, t_outputs), axis=0)
 
         acc = n_correct / n_total
-        f1 = metrics.f1_score(t_targets_all.cpu(), mindspore.ops.argmax(t_outputs_all, -1).cpu(), labels=[0, 1, 2], average='macro')
+        f1 = metrics.f1_score(t_targets_all, mindspore.ops.argmax(t_outputs_all, -1), labels=[0, 1, 2], average='macro')
         return acc, f1
 
     def run(self):
         # Loss and Optimizer
         criterion = mindspore.nn.CrossEntropyLoss()
-        optimizer = self.opt.optimizer(self.model.trainable_params(), lr=self.opt.lr, weight_decay=self.opt.l2reg)
+        optimizer = self.opt.optimizer(self.model.trainable_params(), learning_rate=self.opt.lr, weight_decay=self.opt.l2reg)
 
-        train_data_loader = self.trainset.create_tuple_iterator(num_epochs=opt.num_epoch)
-        test_data_loader = self.testset.create_tuple_iterator(num_epochs=opt.num_epoch)
-        val_data_loader = self.valset.create_tuple_iterator(num_epochs=opt.num_epoch)
+        train_data_loader = self.trainset.create_tuple_iterator(num_epochs=self.opt.num_epoch)
+        test_data_loader = self.testset.create_tuple_iterator(num_epochs=self.opt.num_epoch)
+        val_data_loader = self.valset.create_tuple_iterator(num_epochs=self.opt.num_epoch)
 
-        self._reset_params()
+        # self._reset_params()
         best_model_path = self._train(criterion, optimizer, train_data_loader, val_data_loader)
         mindspore.load_param_into_net(self.model, mindspore.load_checkpoint(best_model_path))
         test_acc, test_f1 = self._evaluate_acc_f1(test_data_loader)
@@ -259,13 +257,16 @@ def main():
     }
     opt.model_class = model_classes[opt.model_name]
     opt.dataset_file = dataset_files[opt.dataset]
-    opt.inputs_cols = input_colses[opt.model_name]
+    opt.inputs_cols = input_colses[opt.model_name] + ['polarity']
     opt.initializer = initializers[opt.initializer]
     opt.optimizer = optimizers[opt.optimizer]
 
     log_file = '{}-{}-{}.log'.format(opt.model_name, opt.dataset, strftime("%y%m%d-%H%M", localtime()))
     logger.addHandler(logging.FileHandler(log_file))
 
+    context.set_context(device_id=opt.device_id)
+    context.set_context(mode=context.PYNATIVE_MODE)
+    
     ins = Instructor(opt)
     ins.run()
 

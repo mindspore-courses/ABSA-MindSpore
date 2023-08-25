@@ -8,7 +8,7 @@ import numpy as np
 from layers.p_sequence import pack_padded_sequence, pad_packed_sequence
 
 class DynamicLSTM(mindspore.nn.Cell):
-    def __init__(self, input_size, hidden_size, num_layers=1, bias=True, batch_first=True, dropout=0,
+    def __init__(self, input_size, hidden_size, num_layers=1, bias=True, batch_first=True, dropout=0.0,
                  bidirectional=False, only_use_last_hidden_state=False, rnn_type = 'LSTM'):
         """
         LSTM which can hold variable length sequence, use like TensorFlow's RNN(input, length...).

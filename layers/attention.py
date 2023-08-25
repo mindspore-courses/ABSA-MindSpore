@@ -30,7 +30,7 @@ class Attention(nn.Cell):
         self.w_k = mindspore.nn.Dense(embed_dim, n_head * hidden_dim)
         self.w_q = mindspore.nn.Dense(embed_dim, n_head * hidden_dim)
         self.proj = mindspore.nn.Dense(n_head * hidden_dim, out_dim)
-        self.dropout = mindspore.nn.Dropout(dropout)
+        self.dropout = mindspore.nn.Dropout(p=dropout)
         if score_function == 'mlp':
             self.weight = mindspore.Parameter(mindspore.tensor(hidden_dim*2))
         elif self.score_function == 'bi_linear':

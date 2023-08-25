@@ -13,7 +13,7 @@ class PositionwiseFeedForward(mindspore.nn.Cell):
             d_inner_hid = d_hid
         self.w_1 = mindspore.nn.Conv1d(d_hid, d_inner_hid, 1)  # position-wise
         self.w_2 = mindspore.nn.Conv1d(d_inner_hid, d_hid, 1)  # position-wise
-        self.dropout = mindspore.nn.Dropout(dropout)
+        self.dropout = mindspore.nn.Dropout(p=dropout)
         self.relu = mindspore.nn.ReLU()
 
     def construct(self, x):
