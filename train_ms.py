@@ -17,6 +17,8 @@ from time import strftime, localtime
 from transformers import BertModel
 
 import mindspore
+import mindspore.nn as nn
+from mindspore.dataset import GeneratorDataset
 
 from data_utils import build_tokenizer, build_embedding_matrix, Tokenizer4Bert, ABSADataset
 from models import LSTM, IAN, MemNet, RAM, TD_LSTM, TC_LSTM, Cabasc, ATAE_LSTM, TNet_LF, AOA, MGAN, ASGCN, LCF_BERT
@@ -46,27 +48,14 @@ class Instructor:
                 dat_fname='{0}_{1}_embedding_matrix.dat'.format(str(opt.embed_dim), opt.dataset))
             self.model = opt.model_class(embedding_matrix, opt)
 
-        self.trainset = ABSADataset(opt.dataset_file['train'], tokenizer)
-        self.testset = ABSADataset(opt.dataset_file['test'], tokenizer)
+        self.trainset = GeneratorDataset(ABSADataset(opt.dataset_file['train'], tokenizer), column_names=opt.inputs_cols, shuffle=True).batch(batch_size=opt.batch_size, drop_remainder=True)
+        self.testset = GeneratorDataset(ABSADataset(opt.dataset_file['test'], tokenizer), column_names=opt.inputs_cols).batch(batch_size=opt.batch_size)
         self.valset = self.testset
 
-    def _print_args(self):
-        n_trainable_params, n_nontrainable_params = 0, 0
-        for p in self.model.parameters():
-            n_params = mindspore.ops.prod(mindspore.tensor(p.shape))
-            if p.requires_grad:
-                n_trainable_params += n_params
-            else:
-                n_nontrainable_params += n_params
-        logger.info('> n_trainable_params: {0}, n_nontrainable_params: {1}'.format(n_trainable_params, n_nontrainable_params))
-        logger.info('> training arguments:')
-        for arg in vars(self.opt):
-            logger.info('>>> {0}: {1}'.format(arg, getattr(self.opt, arg)))
-
     def _reset_params(self):
-        for child in self.model.children():
+        for child in self.model.cells_and_names():
             if type(child) != BertModel:  # skip bert params
-                for p in child.parameters():
+                for p in child.get_parameters():
                     if p.requires_grad:
                         if len(p.shape) > 1:
                             self.opt.initializer(p)
@@ -80,20 +69,22 @@ class Instructor:
         max_val_epoch = 0
         global_step = 0
         path = None
+        net_with_loss = nn.WithLossCell(self.model, criterion)
+        train_network = nn.TrainOneStepCell(net_with_loss, optimizer)
+        train_network.set_train()
         for i_epoch in range(self.opt.num_epoch):
             logger.info('>' * 100)
             logger.info('epoch: {}'.format(i_epoch))
             n_correct, n_total, loss_total = 0, 0, 0
-            # switch model to training mode
-            self.model.train()
+
             for i_batch, batch in enumerate(train_data_loader):
                 global_step += 1
                 # clear gradient accumulators
                 optimizer.zero_grad()
 
-                inputs = [batch[col].to(self.opt.device) for col in self.opt.inputs_cols]
+                inputs = [batch[col] for col in self.opt.inputs_cols]
                 outputs = self.model(inputs)
-                targets = batch['polarity'].to(self.opt.device)
+                targets = batch['polarity']
 
                 loss = criterion(outputs, targets)
                 loss.backward()
@@ -152,12 +143,11 @@ class Instructor:
     def run(self):
         # Loss and Optimizer
         criterion = mindspore.nn.CrossEntropyLoss()
-        _params = filter(lambda p: p.requires_grad, self.model.parameters())
-        optimizer = self.opt.optimizer(_params, lr=self.opt.lr, weight_decay=self.opt.l2reg)
+        optimizer = self.opt.optimizer(self.model.trainable_params(), lr=self.opt.lr, weight_decay=self.opt.l2reg)
 
-        train_data_loader = mindspore.dataset.GeneratorDataset(source=self.trainset, shuffle=True)
-        test_data_loader = mindspore.dataset.GeneratorDataset(source=self.testset, shuffle=False)
-        val_data_loader = mindspore.dataset.GeneratorDataset(source=self.valset, shuffle=False)
+        train_data_loader = self.trainset.create_tuple_iterator(num_epochs=opt.num_epoch)
+        test_data_loader = self.testset.create_tuple_iterator(num_epochs=opt.num_epoch)
+        val_data_loader = self.valset.create_tuple_iterator(num_epochs=opt.num_epoch)
 
         self._reset_params()
         best_model_path = self._train(criterion, optimizer, train_data_loader, val_data_loader)
