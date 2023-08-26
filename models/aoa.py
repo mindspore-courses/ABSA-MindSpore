@@ -6,6 +6,7 @@
 from layers.dynamic_rnn import DynamicLSTM
 import math
 import mindspore
+import numpy as np
 
 class AOA(mindspore.nn.Cell):
     def __init__(self, embedding_matrix, opt):
@@ -22,9 +23,10 @@ class AOA(mindspore.nn.Cell):
     def construct(self, inputs):
         text_indices = inputs[0] # batch_size x seq_len
         aspect_indices = inputs[1] # batch_size x seq_len
-        ctx_len = mindspore.ops.sum(text_indices != 0, dim=1)
-        print(ctx_len)
-        asp_len = mindspore.ops.sum(aspect_indices != 0, dim=1)
+        t_1 = mindspore.tensor(np.array(inputs[0]) != 0, mindspore.int32)
+        ctx_len = mindspore.ops.sum(t_1, dim=1)
+        t_2 = mindspore.tensor(np.array(inputs[1]) != 0, mindspore.int32)
+        asp_len = mindspore.ops.sum(t_2, dim=1)
         ctx = self.embed(text_indices) # batch_size x seq_len x embed_dim
         asp = self.embed(aspect_indices) # batch_size x seq_len x embed_dim
         ctx_out, (_, _) = self.ctx_lstm(ctx, ctx_len) #  batch_size x (ctx) seq_len x 2*hidden_dim
