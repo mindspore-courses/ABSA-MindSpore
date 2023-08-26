@@ -49,8 +49,8 @@ class Instructor:
                 dat_fname='{0}_{1}_embedding_matrix.dat'.format(str(opt.embed_dim), opt.dataset))
             self.model = opt.model_class(embedding_matrix, opt)
 
-        self.trainset = GeneratorDataset(ABSADataset(opt.dataset_file['train'], tokenizer), column_names=opt.inputs_cols, shuffle=True).batch(batch_size=opt.batch_size, drop_remainder=True)
-        self.testset = GeneratorDataset(ABSADataset(opt.dataset_file['test'], tokenizer), column_names=opt.inputs_cols).batch(batch_size=opt.batch_size)
+        self.trainset = GeneratorDataset(ABSADataset(opt.dataset_file['train'], tokenizer), column_names=['data'], shuffle=True).batch(batch_size=opt.batch_size, drop_remainder=True)
+        self.testset = GeneratorDataset(ABSADataset(opt.dataset_file['test'], tokenizer), column_names=['data']).batch(batch_size=opt.batch_size)
         self.valset = self.testset
 
     def _reset_params(self):
@@ -82,9 +82,9 @@ class Instructor:
             for i_batch, batch in enumerate(train_data_loader):
                 global_step += 1
 
-                inputs = [batch[col] for col in self.opt.inputs_cols]
+                inputs = [batch[0][col] for col in self.opt.inputs_cols]
                 outputs = self.model(inputs)
-                targets = batch['polarity']
+                targets = batch[0]['polarity']
 
                 loss = train_network(outputs, targets)
 
@@ -120,8 +120,8 @@ class Instructor:
         # switch model to evaluation mode
         self.model.eval()
         for i_batch, t_batch in enumerate(data_loader):
-            t_inputs = [t_batch[col] for col in self.opt.inputs_cols]
-            t_targets = t_batch['polarity']
+            t_inputs = [t_batch[0][col] for col in self.opt.inputs_cols]
+            t_targets = t_batch[0]['polarity']
             t_outputs = self.model(t_inputs)
 
             n_correct += (mindspore.ops.argmax(t_outputs, -1) == t_targets).sum().item()
@@ -257,7 +257,7 @@ def main():
     }
     opt.model_class = model_classes[opt.model_name]
     opt.dataset_file = dataset_files[opt.dataset]
-    opt.inputs_cols = input_colses[opt.model_name] + ['polarity']
+    opt.inputs_cols = input_colses[opt.model_name]
     opt.initializer = initializers[opt.initializer]
     opt.optimizer = optimizers[opt.optimizer]
 

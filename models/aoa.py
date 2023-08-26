@@ -11,7 +11,10 @@ class AOA(mindspore.nn.Cell):
     def __init__(self, embedding_matrix, opt):
         super(AOA, self).__init__()
         self.opt = opt
-        self.embed = mindspore.nn.Embedding(vocab_size=mindspore.tensor(embedding_matrix, dtype=mindspore.float32).shape[0], embedding_size=mindspore.tensor(embedding_matrix, dtype=mindspore.float32).shape[1])
+        assert mindspore.tensor(embedding_matrix).dim() == 2
+        rows, cols = embedding_matrix.shape
+        self.embed = mindspore.nn.Embedding(rows, cols, embedding_table=mindspore.tensor(embedding_matrix))
+        self.embed.embedding_table.requires_grad = False
         self.ctx_lstm = DynamicLSTM(opt.embed_dim, opt.hidden_dim, num_layers=1, batch_first=True, bidirectional=True)
         self.asp_lstm = DynamicLSTM(opt.embed_dim, opt.hidden_dim, num_layers=1, batch_first=True, bidirectional=True)
         self.dense = mindspore.nn.Dense(2 * opt.hidden_dim, opt.polarities_dim)
@@ -20,6 +23,7 @@ class AOA(mindspore.nn.Cell):
         text_indices = inputs[0] # batch_size x seq_len
         aspect_indices = inputs[1] # batch_size x seq_len
         ctx_len = mindspore.ops.sum(text_indices != 0, dim=1)
+        print(ctx_len)
         asp_len = mindspore.ops.sum(aspect_indices != 0, dim=1)
         ctx = self.embed(text_indices) # batch_size x seq_len x embed_dim
         asp = self.embed(aspect_indices) # batch_size x seq_len x embed_dim

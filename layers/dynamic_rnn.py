@@ -56,8 +56,8 @@ class DynamicLSTM(mindspore.nn.Cell):
         :return:
         """
         """sort"""
-        x_sort_idx = mindspore.ops.sort(-x_len)[1].long()
-        x_unsort_idx = mindspore.ops.sort(x_sort_idx)[1].long()
+        x_sort_idx = mindspore.ops.sort(mindspore.tensor(-x_len, dtype=mindspore.float32))[1].long()
+        x_unsort_idx = mindspore.ops.sort(mindspore.tensor(x_sort_idx, dtype=mindspore.float32))[1].long()
         x_len = x_len[x_sort_idx]
         x = x[x_sort_idx]
         """pack"""
@@ -73,7 +73,6 @@ class DynamicLSTM(mindspore.nn.Cell):
         ht = mindspore.ops.swapaxes(ht, 0, 1)[
             x_unsort_idx]  # (num_layers * num_directions, batch, hidden_size) -> (batch, ...)
         ht = mindspore.ops.swapaxes(ht, 0, 1)
-
         if self.only_use_last_hidden_state:
             return ht
         else:
@@ -86,5 +85,4 @@ class DynamicLSTM(mindspore.nn.Cell):
                 ct = mindspore.ops.swapaxes(ct, 0, 1)[
                     x_unsort_idx]  # (num_layers * num_directions, batch, hidden_size) -> (batch, ...)
                 ct = mindspore.ops.swapaxes(ct, 0, 1)
-
             return out, (ht, ct)
