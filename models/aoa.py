@@ -34,7 +34,7 @@ class AOA(mindspore.nn.Cell):
         interaction_mat = mindspore.ops.matmul(ctx_out, mindspore.ops.swapaxes(asp_out, 1, 2)) # batch_size x (ctx) seq_len x (asp) seq_len
         alpha = mindspore.ops.softmax(interaction_mat, axis=1) # col-wise, batch_size x (ctx) seq_len x (asp) seq_len
         beta = mindspore.ops.softmax(interaction_mat, axis=2) # row-wise, batch_size x (ctx) seq_len x (asp) seq_len
-        beta_avg = beta.mean(dim=1, keepdim=True) # batch_size x 1 x (asp) seq_len
+        beta_avg = beta.mean(axis=1, keep_dims=True) # batch_size x 1 x (asp) seq_len
         gamma = mindspore.ops.matmul(alpha, beta_avg.transpose(1, 2)) # batch_size x (ctx) seq_len x 1
         weighted_sum = mindspore.ops.matmul(mindspore.ops.swapaxes(ctx_out, 1, 2), gamma).squeeze(-1) # batch_size x 2*hidden_dim
         out = self.dense(weighted_sum) # batch_size x polarity_dim

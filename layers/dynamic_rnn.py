@@ -5,7 +5,7 @@
 
 import mindspore
 import numpy as np
-from layers.p_sequence import pack_padded_sequence, pad_packed_sequence
+from layers.p_sequence import pad_packed_sequence
 
 class DynamicLSTM(mindspore.nn.Cell):
     def __init__(self, input_size, hidden_size, num_layers=1, bias=True, batch_first=True, dropout=0.0,
@@ -56,18 +56,16 @@ class DynamicLSTM(mindspore.nn.Cell):
         :return:
         """
         """sort"""
-        x_sort_idx = mindspore.ops.sort(mindspore.tensor(-x_len, dtype=mindspore.float32))[1].long()
-        x_unsort_idx = mindspore.ops.sort(mindspore.tensor(x_sort_idx, dtype=mindspore.float32))[1].long()
+        x_sort_idx = mindspore.ops.sort(mindspore.tensor(-x_len, dtype=mindspore.float32), descending=True)[1].long()
+        x_unsort_idx = mindspore.ops.sort(mindspore.tensor(x_sort_idx, dtype=mindspore.float32), descending=True)[1].long()
         x_len = x_len[x_sort_idx]
         x = x[x_sort_idx]
-        """pack"""
-        x_emb_p = pack_padded_sequence(x, x_len, batch_first=self.batch_first)
-        
+        print(x.shape)
         # process using the selected RNN
         if self.rnn_type == 'LSTM': 
-            out_pack, (ht, ct) = self.RNN(x_emb_p, None)
+            out_pack, (ht, ct) = self.RNN(x, None, x_len)
         else: 
-            out_pack, ht = self.RNN(x_emb_p, None)
+            out_pack, ht = self.RNN(x, None, x_len)
             ct = None
         """unsort: h"""
         ht = mindspore.ops.swapaxes(ht, 0, 1)[
@@ -80,6 +78,9 @@ class DynamicLSTM(mindspore.nn.Cell):
             out = pad_packed_sequence(out_pack, batch_first=self.batch_first)  # (sequence, lengths)
             out = out[0]  #
             out = out[x_unsort_idx]
+            print(out.shape)
+            print(x_unsort_idx)
+            input()
             """unsort: out c"""
             if self.rnn_type =='LSTM':
                 ct = mindspore.ops.swapaxes(ct, 0, 1)[
