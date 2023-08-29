@@ -60,7 +60,6 @@ class DynamicLSTM(mindspore.nn.Cell):
         x_unsort_idx = mindspore.ops.sort(mindspore.tensor(x_sort_idx, dtype=mindspore.float32), descending=True)[1].long()
         x_len = x_len[x_sort_idx]
         x = x[x_sort_idx]
-        print(x.shape)
         # process using the selected RNN
         if self.rnn_type == 'LSTM': 
             out_pack, (ht, ct) = self.RNN(x, None, x_len)
@@ -78,9 +77,6 @@ class DynamicLSTM(mindspore.nn.Cell):
             out = pad_packed_sequence(out_pack, batch_first=self.batch_first)  # (sequence, lengths)
             out = out[0]  #
             out = out[x_unsort_idx]
-            print(out.shape)
-            print(x_unsort_idx)
-            input()
             """unsort: out c"""
             if self.rnn_type =='LSTM':
                 ct = mindspore.ops.swapaxes(ct, 0, 1)[
