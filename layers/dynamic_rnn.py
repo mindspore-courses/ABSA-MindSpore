@@ -56,8 +56,8 @@ class DynamicLSTM(mindspore.nn.Cell):
         :return:
         """
         """sort"""
-        x_sort_idx = mindspore.ops.sort(mindspore.tensor(-x_len, dtype=mindspore.float32), descending=True)[1].long()
-        x_unsort_idx = mindspore.ops.sort(mindspore.tensor(x_sort_idx, dtype=mindspore.float32), descending=True)[1].long()
+        x_sort_idx = mindspore.ops.sort(mindspore.tensor(x_len, dtype=mindspore.int32), descending=True)[1].long()
+        x_unsort_idx = mindspore.ops.sort(mindspore.tensor(x_sort_idx, dtype=mindspore.int32), descending=True)[1].long()
         x_len = x_len[x_sort_idx]
         x = x[x_sort_idx]
         # process using the selected RNN

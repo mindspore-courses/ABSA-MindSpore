@@ -21,6 +21,9 @@ class AOA(mindspore.nn.Cell):
         self.dense = mindspore.nn.Dense(2 * opt.hidden_dim, opt.polarities_dim)
 
     def construct(self, inputs):
+        print('i am 1')
+        print(inputs)
+        print('i am 2')
         text_indices = inputs[0] # batch_size x seq_len
         aspect_indices = inputs[1] # batch_size x seq_len
         t_1 = mindspore.tensor(np.array(inputs[0]) != 0, mindspore.int32)

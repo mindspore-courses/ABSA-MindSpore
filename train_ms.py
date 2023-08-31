@@ -84,8 +84,10 @@ class Instructor:
 
                 inputs = [batch[0][col] for col in self.opt.inputs_cols]
                 outputs = self.model(inputs)
-                targets = batch[0]['polarity']
-
+                targets = batch[0]['polarity'].astype(mindspore.int32)
+                print(outputs)
+                print(targets)
+                print(criterion(outputs, targets))
                 loss = train_network(outputs, targets)
 
                 n_correct += (mindspore.ops.argmax(outputs, -1) == targets).sum().item()
@@ -157,8 +159,8 @@ class Instructor:
 def main():
     # Hyper Parameters
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model_name', default='bert_spc', type=str)
-    parser.add_argument('--dataset', default='laptop', type=str, help='twitter, restaurant, laptop')
+    parser.add_argument('--model_name', default='aoa', type=str)
+    parser.add_argument('--dataset', default='restaurant', type=str, help='twitter, restaurant, laptop')
     parser.add_argument('--optimizer', default='adam', type=str)
     parser.add_argument('--initializer', default='xavier_uniform_', type=str)
     parser.add_argument('--lr', default=2e-5, type=float, help='try 5e-5, 2e-5 for BERT, 1e-3 for others')
@@ -264,7 +266,7 @@ def main():
     log_file = '{}-{}-{}.log'.format(opt.model_name, opt.dataset, strftime("%y%m%d-%H%M", localtime()))
     logger.addHandler(logging.FileHandler(log_file))
 
-    context.set_context(device_id=opt.device_id)
+    context.set_context(device_target=opt.device , device_id=opt.device_id)
     context.set_context(mode=context.PYNATIVE_MODE)
     
     ins = Instructor(opt)
