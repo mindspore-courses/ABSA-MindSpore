@@ -85,10 +85,7 @@ class Instructor:
                 inputs = [batch[0][col] for col in self.opt.inputs_cols]
                 outputs = self.model(inputs)
                 targets = batch[0]['polarity'].astype(mindspore.int32)
-                print(outputs)
-                print(targets)
-                print(criterion(outputs, targets))
-                loss = train_network(outputs, targets)
+                loss = train_network(inputs, targets)
 
                 n_correct += (mindspore.ops.argmax(outputs, -1) == targets).sum().item()
                 n_total += len(outputs)
@@ -96,10 +93,11 @@ class Instructor:
                 if global_step % self.opt.log_step == 0:
                     train_acc = n_correct / n_total
                     train_loss = loss_total / n_total
-                    logger.info('loss: {:.4f}, acc: {:.4f}'.format(train_loss, train_acc))
+                    print(train_acc, train_loss)
+                    #logger.info('loss: {:.4f}, acc: {:.4f}'.format(train_loss.item(), train_acc.item()))
 
             val_acc, val_f1 = self._evaluate_acc_f1(val_data_loader)
-            logger.info('> val_acc: {:.4f}, val_f1: {:.4f}'.format(val_acc, val_f1))
+            logger.info('> val_acc: {:.4f}, val_f1: {:.4f}'.format(val_acc.item(), val_f1.item()))
             if val_acc > max_val_acc:
                 max_val_acc = val_acc
                 max_val_epoch = i_epoch
@@ -107,7 +105,7 @@ class Instructor:
                     os.mkdir('state_dict')
                 path = 'state_dict/{0}_{1}_val_acc_{2}'.format(self.opt.model_name, self.opt.dataset, round(val_acc, 4))
                 mindspore.save_checkpoint(self.model, path)
-                logger.info('>> saved: {}'.format(path))
+                #logger.info('>> saved: {}'.format(path))
             if val_f1 > max_val_f1:
                 max_val_f1 = val_f1
             if i_epoch - max_val_epoch >= self.opt.patience:
