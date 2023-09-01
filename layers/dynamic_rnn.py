@@ -5,7 +5,6 @@
 
 import mindspore
 import numpy as np
-from layers.p_sequence import pad_packed_sequence
 
 class DynamicLSTM(mindspore.nn.Cell):
     def __init__(self, input_size, hidden_size, num_layers=1, bias=True, batch_first=True, dropout=0.0,
@@ -74,8 +73,7 @@ class DynamicLSTM(mindspore.nn.Cell):
             return ht
         else:
             """unpack: out"""
-            out = pad_packed_sequence(out_pack, batch_first=self.batch_first)  # (sequence, lengths)
-            out = out[0]  #
+            out = out_pack[0]  #
             out = out[x_unsort_idx]
             """unsort: out c"""
             if self.rnn_type =='LSTM':

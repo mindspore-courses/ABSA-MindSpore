@@ -1,19 +1,20 @@
-# -*- coding: utf-8 -*-
-# file: train.py
-# author: songyouwei <youwei0314@gmail.com>
-# Copyright (C) 2018. All Rights Reserved.
-
-import logging
-import argparse
-import math
+# -*- encoding: utf-8 -*-
+'''
+@File    :   train_ms.py
+@Time    :   2023/09/01 
+@Author  :   rain 
+@Mail    :   work@rainz.tech
+'''
 import os
 import sys
+import math
 import random
 import numpy
+import logging
+import argparse
 
 from sklearn import metrics
 from time import strftime, localtime
-
 from transformers import BertModel
 
 import mindspore
@@ -33,7 +34,7 @@ logger.addHandler(logging.StreamHandler(sys.stdout))
 class Instructor:
     def __init__(self, opt):
         self.opt = opt
-
+        
         if 'bert' in opt.model_name:
             tokenizer = Tokenizer4Bert(opt.max_seq_len, opt.pretrained_bert_name)
             bert = BertModel.from_pretrained(opt.pretrained_bert_name, return_dict=False)
@@ -52,18 +53,6 @@ class Instructor:
         self.trainset = GeneratorDataset(ABSADataset(opt.dataset_file['train'], tokenizer), column_names=['data'], shuffle=True).batch(batch_size=opt.batch_size, drop_remainder=True)
         self.testset = GeneratorDataset(ABSADataset(opt.dataset_file['test'], tokenizer), column_names=['data']).batch(batch_size=opt.batch_size)
         self.valset = self.testset
-
-    def _reset_params(self):
-        for child in self.model.cells():
-            if type(child) != BertModel:  # skip bert params
-                for p in child.get_parameters():
-                    print(p)
-                    if p.requires_grad:
-                        if len(p.shape) > 1:
-                            self.opt.initializer(p)
-                        else:
-                            stdv = 1. / math.sqrt(p.shape[0])
-                            mindspore.ops.uniform(p, minval=-stdv, maxval=stdv)
 
     def _train(self, criterion, optimizer, train_data_loader, val_data_loader):
         max_val_acc = 0
@@ -94,10 +83,10 @@ class Instructor:
                     train_acc = float(n_correct) / float(n_total)
                     train_loss = loss_total / n_total
                     print(train_acc, train_loss)
-                    logger.info('loss: {:.4f}, acc: {:.4f}'.format(train_loss.item(), train_acc.item()))
+                    logger.info('loss: {}, acc: {}'.format(train_loss, train_acc))
 
             val_acc, val_f1 = self._evaluate_acc_f1(val_data_loader)
-            logger.info('> val_acc: {:.4f}, val_f1: {:.4f}'.format(val_acc.item(), val_f1.item()))
+            logger.info('> val_acc: {}, val_f1: {}'.format(val_acc, val_f1))
             if val_acc > max_val_acc:
                 max_val_acc = val_acc
                 max_val_epoch = i_epoch
@@ -118,7 +107,7 @@ class Instructor:
         n_correct, n_total = 0, 0
         t_targets_all, t_outputs_all = None, None
         # switch model to evaluation mode
-        self.model.eval()
+        self.model.set_train(False)
         for i_batch, t_batch in enumerate(data_loader):
             t_inputs = [t_batch[0][col] for col in self.opt.inputs_cols]
             t_targets = t_batch[0]['polarity']
@@ -135,11 +124,10 @@ class Instructor:
                 t_outputs_all = mindspore.ops.cat((t_outputs_all, t_outputs), axis=0)
 
         acc = float(n_correct) / float(n_total)
-        f1 = metrics.f1_score(t_targets_all, mindspore.ops.argmax(t_outputs_all, -1), labels=[0, 1, 2], average='macro')
+        f1 = metrics.f1_score(t_targets_all.asnumpy(), mindspore.ops.argmax(t_outputs_all, -1).asnumpy(), labels=[0, 1, 2], average='macro')
         return acc, f1
 
     def run(self):
-        # Loss and Optimizer
         criterion = mindspore.nn.CrossEntropyLoss()
         optimizer = self.opt.optimizer(self.model.trainable_params(), learning_rate=self.opt.lr, weight_decay=self.opt.l2reg)
 
@@ -147,7 +135,6 @@ class Instructor:
         test_data_loader = self.testset.create_tuple_iterator(num_epochs=self.opt.num_epoch)
         val_data_loader = self.valset.create_tuple_iterator(num_epochs=self.opt.num_epoch)
 
-        # self._reset_params()
         best_model_path = self._train(criterion, optimizer, train_data_loader, val_data_loader)
         mindspore.load_param_into_net(self.model, mindspore.load_checkpoint(best_model_path))
         test_acc, test_f1 = self._evaluate_acc_f1(test_data_loader)
@@ -165,7 +152,7 @@ def main():
     parser.add_argument('--dropout', default=0.1, type=float)
     parser.add_argument('--l2reg', default=0.01, type=float)
     parser.add_argument('--num_epoch', default=20, type=int, help='try larger number for non-BERT models')
-    parser.add_argument('--batch_size', default=16, type=int, help='try 16, 32, 64 for BERT models')
+    parser.add_argument('--batch_size', default=128, type=int, help='try 16, 32, 64 for BERT models')
     parser.add_argument('--log_step', default=10, type=int)
     parser.add_argument('--embed_dim', default=300, type=int)
     parser.add_argument('--hidden_dim', default=300, type=int)
@@ -178,7 +165,6 @@ def main():
     parser.add_argument('--device', default='GPU', type=str, help='e.g. GPU')
     parser.add_argument('--device_id', default=0, type=str, help='e.g. 5')
     parser.add_argument('--seed', default=1234, type=int, help='set seed for reproducibility')
-    # The following parameters are only valid for the lcf-bert model
     parser.add_argument('--local_context_focus', default='cdm', type=str, help='local context focus mode, cdw or cdm')
     parser.add_argument('--SRD', default=3, type=int, help='semantic-relative-distance, see the paper of LCF-BERT model')
     opt = parser.parse_args()
@@ -269,7 +255,6 @@ def main():
     
     ins = Instructor(opt)
     ins.run()
-
 
 if __name__ == '__main__':
     main()

@@ -8,10 +8,10 @@
 
 ## Requirement
 
-* mindspore >= 2.0.0
+* mindspore >= 2.1.0
 * numpy >= 1.13.3
 * sklearn
-* python 3.6 / 3.7
+* python 3.7
 * transformers
 
 * For non-BERT-based models,
@@ -22,7 +22,7 @@
 ### Training
 
 ```sh
-python train_ms.py --model_name bert_spc --dataset restaurant
+python train_ms.py --model_name aoa --dataset restaurant
 ```
 
 * All implemented models are listed in [models directory](./models/).
