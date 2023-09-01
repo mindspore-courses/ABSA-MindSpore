@@ -91,10 +91,10 @@ class Instructor:
                 n_total += len(outputs)
                 loss_total += loss.item() * len(outputs)
                 if global_step % self.opt.log_step == 0:
-                    train_acc = n_correct / n_total
+                    train_acc = float(n_correct) / float(n_total)
                     train_loss = loss_total / n_total
                     print(train_acc, train_loss)
-                    #logger.info('loss: {:.4f}, acc: {:.4f}'.format(train_loss.item(), train_acc.item()))
+                    logger.info('loss: {:.4f}, acc: {:.4f}'.format(train_loss.item(), train_acc.item()))
 
             val_acc, val_f1 = self._evaluate_acc_f1(val_data_loader)
             logger.info('> val_acc: {:.4f}, val_f1: {:.4f}'.format(val_acc.item(), val_f1.item()))
@@ -105,7 +105,7 @@ class Instructor:
                     os.mkdir('state_dict')
                 path = 'state_dict/{0}_{1}_val_acc_{2}'.format(self.opt.model_name, self.opt.dataset, round(val_acc, 4))
                 mindspore.save_checkpoint(self.model, path)
-                #logger.info('>> saved: {}'.format(path))
+                logger.info('>> saved: {}'.format(path))
             if val_f1 > max_val_f1:
                 max_val_f1 = val_f1
             if i_epoch - max_val_epoch >= self.opt.patience:
@@ -134,7 +134,7 @@ class Instructor:
                 t_targets_all = mindspore.ops.cat((t_targets_all, t_targets), axis=0)
                 t_outputs_all = mindspore.ops.cat((t_outputs_all, t_outputs), axis=0)
 
-        acc = n_correct / n_total
+        acc = float(n_correct) / float(n_total)
         f1 = metrics.f1_score(t_targets_all, mindspore.ops.argmax(t_outputs_all, -1), labels=[0, 1, 2], average='macro')
         return acc, f1
 
