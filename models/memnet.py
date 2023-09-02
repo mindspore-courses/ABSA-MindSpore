@@ -7,7 +7,6 @@ from layers.attention import Attention
 import torch
 import torch.nn as nn
 import mindspore
-from layers.squeeze_embedding import SqueezeEmbedding
 
 
 class MemNet(mindspore.nn.Cell):

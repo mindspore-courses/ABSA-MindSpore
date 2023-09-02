@@ -8,6 +8,7 @@ from layers.squeeze_embedding import SqueezeEmbedding
 from layers.attention import Attention, NoQueryAttention
 from layers.point_wise_feed_forward import PositionwiseFeedForward
 import mindspore
+import numpy as np
 
 # CrossEntropyLoss for Label Smoothing Regularization
 class CrossEntropyLoss_LSR(mindspore.nn.Cell):
@@ -55,8 +56,10 @@ class AEN_BERT(mindspore.nn.Cell):
 
     def construct(self, inputs):
         context, target = inputs[0], inputs[1]
-        context_len = mindspore.ops.sum(context != 0, dim=-1)
-        target_len = mindspore.ops.sum(target != 0, dim=-1)
+        t_1 = mindspore.tensor(np.array(inputs[0]) != 0, mindspore.int32)
+        context_len = mindspore.ops.sum(t_1, dim=-1)
+        t_2 = mindspore.tensor(np.array(inputs[1]) != 0, mindspore.int32)
+        target_len = mindspore.ops.sum(t_2, dim=-1)
         context = self.squeeze_embedding(context, context_len)
         context, _ = self.bert(context)
         context = self.dropout(context)

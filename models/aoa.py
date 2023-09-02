@@ -23,6 +23,7 @@ class AOA(mindspore.nn.Cell):
     def construct(self, inputs):
         text_indices = inputs[0] # batch_size x seq_len
         aspect_indices = inputs[1] # batch_size x seq_len
+        # it goes wrong when we use mindspore.ops.sum with the type of bool, so we transform it into numpy array first.
         t_1 = mindspore.tensor(np.array(inputs[0]) != 0, mindspore.int32)
         ctx_len = mindspore.ops.sum(t_1, dim=1)
         t_2 = mindspore.tensor(np.array(inputs[1]) != 0, mindspore.int32)

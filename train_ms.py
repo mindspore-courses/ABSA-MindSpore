@@ -87,7 +87,7 @@ class Instructor:
 
             val_acc, val_f1 = self._evaluate_acc_f1(val_data_loader)
             logger.info('> val_acc: {}, val_f1: {}'.format(val_acc, val_f1))
-            if val_acc > max_val_acc:
+            if val_acc >= max_val_acc:
                 max_val_acc = val_acc
                 max_val_epoch = i_epoch
                 if not os.path.exists('state_dict'):
@@ -95,7 +95,7 @@ class Instructor:
                 path = 'state_dict/{0}_{1}_val_acc_{2}'.format(self.opt.model_name, self.opt.dataset, round(val_acc, 4))
                 mindspore.save_checkpoint(self.model, path)
                 logger.info('>> saved: {}'.format(path))
-            if val_f1 > max_val_f1:
+            if val_f1 >= max_val_f1:
                 max_val_f1 = val_f1
             if i_epoch - max_val_epoch >= self.opt.patience:
                 print('>> early stop.')
@@ -123,6 +123,7 @@ class Instructor:
                 t_targets_all = mindspore.ops.cat((t_targets_all, t_targets), axis=0)
                 t_outputs_all = mindspore.ops.cat((t_outputs_all, t_outputs), axis=0)
 
+        print(n_correct, n_total)
         acc = float(n_correct) / float(n_total)
         f1 = metrics.f1_score(t_targets_all.asnumpy(), mindspore.ops.argmax(t_outputs_all, -1).asnumpy(), labels=[0, 1, 2], average='macro')
         return acc, f1
@@ -144,7 +145,7 @@ class Instructor:
 def main():
     # Hyper Parameters
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model_name', default='aoa', type=str)
+    parser.add_argument('--model_name', default='aen_bert', type=str)
     parser.add_argument('--dataset', default='restaurant', type=str, help='twitter, restaurant, laptop')
     parser.add_argument('--optimizer', default='adam', type=str)
     parser.add_argument('--initializer', default='xavier_uniform_', type=str)

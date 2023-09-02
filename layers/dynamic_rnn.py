@@ -73,8 +73,7 @@ class DynamicLSTM(mindspore.nn.Cell):
             return ht
         else:
             """unpack: out"""
-            out = out_pack[0]  #
-            out = out[x_unsort_idx]
+            out = out_pack[x_unsort_idx]
             """unsort: out c"""
             if self.rnn_type =='LSTM':
                 ct = mindspore.ops.swapaxes(ct, 0, 1)[
