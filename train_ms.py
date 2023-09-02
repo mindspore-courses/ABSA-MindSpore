@@ -51,7 +51,7 @@ class Instructor:
             self.model = opt.model_class(embedding_matrix, opt)
 
         self.trainset = GeneratorDataset(ABSADataset(opt.dataset_file['train'], tokenizer), column_names=['data'], shuffle=True).batch(batch_size=opt.batch_size, drop_remainder=True)
-        self.testset = GeneratorDataset(ABSADataset(opt.dataset_file['test'], tokenizer), column_names=['data']).batch(batch_size=opt.batch_size)
+        self.testset = GeneratorDataset(ABSADataset(opt.dataset_file['test'], tokenizer), column_names=['data'], shuffle=True).batch(batch_size=opt.batch_size)
         self.valset = self.testset
 
     def _train(self, criterion, optimizer, train_data_loader, val_data_loader):
