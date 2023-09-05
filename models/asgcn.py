@@ -17,9 +17,9 @@ class GraphConvolution(mindspore.nn.Cell):
         super(GraphConvolution, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
-        self.weight = mindspore.Parameter(mindspore.numpy.randn((in_features, out_features), dtype=mindspore.float64))
+        self.weight = mindspore.Parameter(mindspore.numpy.randn((in_features, out_features), dtype=mindspore.float32))
         if bias:
-            self.bias = mindspore.Parameter(mindspore.numpy.randn((out_features), dtype=mindspore.float64))
+            self.bias = mindspore.Parameter(mindspore.numpy.randn((out_features), dtype=mindspore.float32))
         else:
             self.register_parameter('bias', None)
 
@@ -37,12 +37,12 @@ class ASGCN(mindspore.nn.Cell):
         super(ASGCN, self).__init__()
         self.opt = opt
         rows, cols = embedding_matrix.shape
-        self.embed = mindspore.nn.Embedding(rows, cols, embedding_table=mindspore.tensor(embedding_matrix))
+        self.embed = mindspore.nn.Embedding(rows, cols, embedding_table=mindspore.tensor(embedding_matrix, dtype=mindspore.float32))
         self.text_lstm = DynamicLSTM(opt.embed_dim, opt.hidden_dim, num_layers=1, batch_first=True, bidirectional=True)
         self.gc1 = GraphConvolution(2*opt.hidden_dim, 2*opt.hidden_dim)
         self.gc2 = GraphConvolution(2*opt.hidden_dim, 2*opt.hidden_dim)
         self.fc = mindspore.nn.Dense(2*opt.hidden_dim, opt.polarities_dim)
-        self.text_embed_dropout = mindspore.nn.Dropout(p=0.3)
+        self.text_embed_dropout = mindspore.nn.Dropout(p=0.3, dtype=mindspore.float32)
 
     def position_weight(self, x, aspect_double_idx, text_len, aspect_len):
         batch_size = x.shape[0]
@@ -61,9 +61,9 @@ class ASGCN(mindspore.nn.Cell):
                 weight[i].append(1-(j-aspect_double_idx[i,1])/context_len)
             for j in range(text_len[i], seq_len):
                 weight[i].append(0)
-        weight = mindspore.tensor(weight, dtype=mindspore.float64).unsqueeze(2)
+        weight = mindspore.tensor(weight, dtype=mindspore.float32).unsqueeze(2)
         return weight*x
-
+    
     def mask(self, x, aspect_double_idx):
         batch_size, seq_len = x.shape[0], x.shape[1]
         aspect_double_idx = aspect_double_idx.numpy()
@@ -75,11 +75,12 @@ class ASGCN(mindspore.nn.Cell):
                 mask[i].append(1)
             for j in range(aspect_double_idx[i,1]+1, seq_len):
                 mask[i].append(0)
-        mask = mindspore.tensor(mask, dtype=mindspore.float64).unsqueeze(2)
+        mask = mindspore.tensor(mask, dtype=mindspore.float32).unsqueeze(2)
         return mask*x
 
     def construct(self, inputs):
         text_indices, aspect_indices, left_indices, adj = inputs
+        adj = adj.astype(mindspore.float32)
         t_1 = mindspore.tensor(np.array(text_indices) != 0, mindspore.int32)
         text_len = mindspore.ops.sum(t_1, dim=-1)
         t_2 = mindspore.tensor(np.array(aspect_indices) != 0, mindspore.int32)
@@ -89,11 +90,13 @@ class ASGCN(mindspore.nn.Cell):
         aspect_double_idx = mindspore.ops.cat([left_len.unsqueeze(1), (left_len+aspect_len-1).unsqueeze(1)], axis=1)
         text = self.embed(text_indices)
         text = self.text_embed_dropout(text)
+        text = text.astype(mindspore.float32)
         text_out, (_, _) = self.text_lstm(text, text_len)
+        text_out = text_out.astype(mindspore.float32)
         seq_len = text_out.shape[1]
         adj = adj[:, :seq_len, :seq_len]
-        x = mindspore.ops.relu(self.gc1(self.position_weight(text_out, aspect_double_idx, text_len, aspect_len), adj.astype(mindspore.float64)))
-        x = mindspore.ops.relu(self.gc2(self.position_weight(x, aspect_double_idx, text_len, aspect_len), adj.astype(mindspore.float64)))
+        x = mindspore.ops.relu(self.gc1(self.position_weight(text_out, aspect_double_idx, text_len, aspect_len), adj))
+        x = mindspore.ops.relu(self.gc2(self.position_weight(x, aspect_double_idx, text_len, aspect_len), adj))
         x = self.mask(x, aspect_double_idx)
         alpha_mat = mindspore.ops.matmul(x, mindspore.ops.swapaxes(text_out, 1, 2))
         alpha = mindspore.ops.softmax(alpha_mat.sum(1, keepdims=True), axis=2)
