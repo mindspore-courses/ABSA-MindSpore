@@ -92,7 +92,7 @@ class Instructor:
                 max_val_epoch = i_epoch
                 if not os.path.exists('state_dict'):
                     os.mkdir('state_dict')
-                path = 'state_dict/{0}_{1}_val_acc_{2}'.format(self.opt.model_name, self.opt.dataset, round(val_acc, 4))
+                path = 'state_dict/{0}_{1}_val_acc_{2}.ckpt'.format(self.opt.model_name, self.opt.dataset, round(val_acc, 4))
                 mindspore.save_checkpoint(self.model, path)
                 logger.info('>> saved: {}'.format(path))
             if val_f1 >= max_val_f1:
@@ -145,7 +145,7 @@ class Instructor:
 def main():
     # Hyper Parameters
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model_name', default='asgcn', type=str)
+    parser.add_argument('--model_name', default='lstm', type=str)
     parser.add_argument('--dataset', default='restaurant', type=str, help='twitter, restaurant, laptop')
     parser.add_argument('--optimizer', default='adam', type=str)
     parser.add_argument('--initializer', default='xavier_uniform_', type=str)
