@@ -14,7 +14,8 @@ class ATAE_LSTM(mindspore.nn.Cell):
     def __init__(self, embedding_matrix, opt):
         super(ATAE_LSTM, self).__init__()
         self.opt = opt
-        self.embed = nn.Embedding.from_pretrained(mindspore.tensor(embedding_matrix, dtype=ms.float32))
+        rows, cols = embedding_matrix.shape
+        self.embed = mindspore.nn.Embedding(rows, cols, embedding_table=mindspore.tensor(embedding_matrix, dtype=mindspore.float32))
         self.squeeze_embedding = SqueezeEmbedding()
         self.lstm = DynamicLSTM(opt.embed_dim*2, opt.hidden_dim, num_layers=1, batch_first=True)
         self.attention = NoQueryAttention(opt.hidden_dim+opt.embed_dim, score_function='bi_linear')

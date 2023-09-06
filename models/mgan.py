@@ -100,9 +100,9 @@ class MGAN(mindspore.nn.Cell):
         f_ctx2asp = mindspore.ops.matmul(mindspore.ops.softmax(mindspore.ops.max(alignment_mat, 1, keepdims=True)[0], axis=2), asp_out)
         f_ctx2asp = mindspore.ops.swapaxes(f_ctx2asp, 1, 2).squeeze(-1) 
         
-        c_asp2ctx_alpha = mindspore.ops.softmax(ctx_out.matmul(self.w_a2c.expand(batch_size, -1, -1)).matmul(asp_pool), axis=1)
+        c_asp2ctx_alpha = mindspore.ops.softmax(ctx_out.matmul(self.w_a2c.expand_dims(0)).matmul(asp_pool), axis=1)
         c_asp2ctx = mindspore.ops.matmul(mindspore.ops.swapaxes(ctx_out, 1, 2), c_asp2ctx_alpha).squeeze(-1)
-        c_ctx2asp_alpha = mindspore.ops.softmax(asp_out.matmul(self.w_c2a.expand(batch_size, -1, -1)).matmul(ctx_pool), axis=1)
+        c_ctx2asp_alpha = mindspore.ops.softmax(asp_out.matmul(self.w_c2a.expand_dims(0)).matmul(ctx_pool), axis=1)
         c_ctx2asp = mindspore.ops.matmul(mindspore.ops.swapaxes(asp_out, 1, 2), c_ctx2asp_alpha).squeeze(-1)
 
         feat = mindspore.ops.cat([c_asp2ctx, f_asp2ctx, f_ctx2asp, c_ctx2asp], axis=1)
