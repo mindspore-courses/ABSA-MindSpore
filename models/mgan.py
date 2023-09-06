@@ -4,10 +4,8 @@
 # Copyright (C) 2018. All Rights Reserved.
 
 from layers.dynamic_rnn import DynamicLSTM
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
 import mindspore
+import numpy as np
 
 class LocationEncoding(mindspore.nn.Cell):
     def __init__(self, opt):
@@ -15,13 +13,13 @@ class LocationEncoding(mindspore.nn.Cell):
         self.opt = opt
 
     def construct(self, x, pos_inx):
-        batch_size, seq_len = x.size()[0], x.size()[1]
+        batch_size, seq_len = x.shape[0], x.shape[1]
         weight = self.weight_matrix(pos_inx, batch_size, seq_len)
         x = weight.unsqueeze(2) * x
         return x
 
     def weight_matrix(self, pos_inx, batch_size, seq_len):
-        pos_inx = pos_inx.cpu().numpy()
+        pos_inx = pos_inx.numpy()
         weight = [[] for i in range(batch_size)]
         for i in range(batch_size):
             for j in range(pos_inx[i][0]):
@@ -43,30 +41,31 @@ class AlignmentMatrix(mindspore.nn.Cell):
     def __init__(self, opt):
         super(AlignmentMatrix, self).__init__()
         self.opt = opt
-        self.w_u = nn.Parameter(mindspore.tensor(6*opt.hidden_dim, 1))
+        self.w_u = mindspore.Parameter(mindspore.numpy.randn((6*opt.hidden_dim, 1), dtype=mindspore.float32))
 
     def construct(self, batch_size, ctx, asp):
-        ctx_len = ctx.size(1)
-        asp_len = asp.size(1)
-        alignment_mat = mindspore.ops.zeros(batch_size, ctx_len, asp_len)
-        ctx_chunks = ctx.chunk(ctx_len, dim=1)
-        asp_chunks = asp.chunk(asp_len, dim=1)
+        ctx_len = ctx.shape[1]
+        asp_len = asp.shape[1]
+        alignment_mat = mindspore.ops.zeros((batch_size, ctx_len, asp_len), mindspore.float32)
+        ctx_chunks = ctx.chunk(ctx_len, axis=1)
+        asp_chunks = asp.chunk(asp_len, axis=1)
         for i, ctx_chunk in enumerate(ctx_chunks):
             for j, asp_chunk in enumerate(asp_chunks):
-                feat = mindspore.ops.cat([ctx_chunk, asp_chunk, ctx_chunk*asp_chunk], dim=2) # batch_size x 1 x 6*hidden_dim 
-                alignment_mat[:, i, j] = feat.matmul(self.w_u.expand(batch_size, -1, -1)).squeeze(-1).squeeze(-1) 
+                feat = mindspore.ops.cat([ctx_chunk, asp_chunk, ctx_chunk*asp_chunk], axis=2) # batch_size x 1 x 6*hidden_dim 
+                alignment_mat[:, i, j] = feat.matmul(self.w_u.expand_dims(0)).squeeze(-1).squeeze(-1) 
         return alignment_mat
 
 class MGAN(mindspore.nn.Cell):
     def __init__(self, embedding_matrix, opt):
         super(MGAN, self).__init__()
         self.opt = opt
-        self.embed = nn.Embedding.from_pretrained(mindspore.tensor(embedding_matrix, dtype=ms.float32))
+        rows, cols = embedding_matrix.shape
+        self.embed = mindspore.nn.Embedding(rows, cols, embedding_table=mindspore.tensor(embedding_matrix, dtype=mindspore.float32))
         self.ctx_lstm = DynamicLSTM(opt.embed_dim, opt.hidden_dim, num_layers=1, batch_first=True, bidirectional=True)
         self.asp_lstm = DynamicLSTM(opt.embed_dim, opt.hidden_dim, num_layers=1, batch_first=True, bidirectional=True)
         self.location = LocationEncoding(opt)
-        self.w_a2c = nn.Parameter(mindspore.tensor(2*opt.hidden_dim, 2*opt.hidden_dim))
-        self.w_c2a = nn.Parameter(mindspore.tensor(2*opt.hidden_dim, 2*opt.hidden_dim))
+        self.w_a2c = mindspore.Parameter(mindspore.numpy.randn((2*opt.hidden_dim, 2*opt.hidden_dim), dtype=mindspore.float32))
+        self.w_c2a = mindspore.Parameter(mindspore.numpy.randn((2*opt.hidden_dim, 2*opt.hidden_dim), dtype=mindspore.float32))
         self.alignment = AlignmentMatrix(opt)
         self.dense = mindspore.nn.Dense(8*opt.hidden_dim, opt.polarities_dim)
 
@@ -74,11 +73,14 @@ class MGAN(mindspore.nn.Cell):
         text_raw_indices = inputs[0] # batch_size x seq_len
         aspect_indices = inputs[1] 
         text_left_indices= inputs[2]
-        batch_size = text_raw_indices.size(0)
-        ctx_len = mindspore.ops.sum(text_raw_indices != 0, dim=1)
-        asp_len = mindspore.ops.sum(aspect_indices != 0, dim=1)
-        left_len = mindspore.ops.sum(text_left_indices != 0, dim=-1)
-        aspect_in_text = mindspore.ops.cat([left_len.unsqueeze(-1), (left_len+asp_len-1).unsqueeze(-1)], dim=-1)
+        batch_size = text_raw_indices.shape[0]
+        t_1 = mindspore.tensor(np.array(text_raw_indices) != 0, mindspore.int32)
+        ctx_len = mindspore.ops.sum(t_1, dim=1)
+        t_2 = mindspore.tensor(np.array(aspect_indices) != 0, mindspore.int32)
+        asp_len = mindspore.ops.sum(t_2, dim=1)
+        t_3 = mindspore.tensor(np.array(text_left_indices) != 0, mindspore.int32)
+        left_len = mindspore.ops.sum(t_3, dim=-1)
+        aspect_in_text = mindspore.ops.cat([left_len.unsqueeze(-1), (left_len+asp_len-1).unsqueeze(-1)], axis=-1)
 
         ctx = self.embed(text_raw_indices) # batch_size x seq_len x embed_dim
         asp = self.embed(aspect_indices) # batch_size x seq_len x embed_dim
@@ -94,15 +96,16 @@ class MGAN(mindspore.nn.Cell):
 
         alignment_mat = self.alignment(batch_size, ctx_out, asp_out) # batch_size x (ctx)seq_len x (asp)seq_len
         # batch_size x 2*hidden_dim
-        f_asp2ctx = mindspore.ops.matmul(ctx_out.transpose(1, 2), mindspore.ops.softmax(alignment_mat.max(2, keepdim=True)[0], axis=1)).squeeze(-1)
-        f_ctx2asp = mindspore.ops.matmul(mindspore.ops.softmax(alignment_mat.max(1, keepdim=True)[0], axis=2), asp_out).transpose(1, 2).squeeze(-1) 
-
+        f_asp2ctx = mindspore.ops.matmul(mindspore.ops.swapaxes(ctx_out, 1, 2), mindspore.ops.softmax(alignment_mat.max(2, keepdims=True)[0], axis=1)).squeeze(-1)
+        f_ctx2asp = mindspore.ops.matmul(mindspore.ops.softmax(mindspore.ops.max(alignment_mat, 1, keepdims=True)[0], axis=2), asp_out)
+        f_ctx2asp = mindspore.ops.swapaxes(f_ctx2asp, 1, 2).squeeze(-1) 
+        
         c_asp2ctx_alpha = mindspore.ops.softmax(ctx_out.matmul(self.w_a2c.expand(batch_size, -1, -1)).matmul(asp_pool), axis=1)
-        c_asp2ctx = mindspore.ops.matmul(ctx_out.transpose(1, 2), c_asp2ctx_alpha).squeeze(-1)
+        c_asp2ctx = mindspore.ops.matmul(mindspore.ops.swapaxes(ctx_out, 1, 2), c_asp2ctx_alpha).squeeze(-1)
         c_ctx2asp_alpha = mindspore.ops.softmax(asp_out.matmul(self.w_c2a.expand(batch_size, -1, -1)).matmul(ctx_pool), axis=1)
-        c_ctx2asp = mindspore.ops.matmul(asp_out.transpose(1, 2), c_ctx2asp_alpha).squeeze(-1)
+        c_ctx2asp = mindspore.ops.matmul(mindspore.ops.swapaxes(asp_out, 1, 2), c_ctx2asp_alpha).squeeze(-1)
 
-        feat = mindspore.ops.cat([c_asp2ctx, f_asp2ctx, f_ctx2asp, c_ctx2asp], dim=1)
+        feat = mindspore.ops.cat([c_asp2ctx, f_asp2ctx, f_ctx2asp, c_ctx2asp], axis=1)
         out = self.dense(feat) # bathc_size x polarity_dim
 
         return out
