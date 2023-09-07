@@ -24,7 +24,7 @@ class Attention(nn.Cell):
         if out_dim is None:
             out_dim = embed_dim
         self.embed_dim = embed_dim
-        self.hidden_dim = hidden_dim
+        self.hidden_dim = int(hidden_dim)
         self.n_head = n_head
         self.score_function = score_function
         self.w_k = mindspore.nn.Dense(embed_dim, n_head * hidden_dim)
@@ -32,9 +32,9 @@ class Attention(nn.Cell):
         self.proj = mindspore.nn.Dense(n_head * hidden_dim, out_dim)
         self.dropout = mindspore.nn.Dropout(p=dropout)
         if score_function == 'mlp':
-            self.weight = mindspore.Parameter(mindspore.tensor(hidden_dim*2))
+            self.weight = mindspore.Parameter(mindspore.numpy.randn((hidden_dim*2), dtype=mindspore.float32))
         elif self.score_function == 'bi_linear':
-            self.weight = mindspore.Parameter(mindspore.tensor(hidden_dim, hidden_dim))
+            self.weight = mindspore.Parameter(mindspore.numpy.randn((hidden_dim, hidden_dim), dtype=mindspore.float32))
         else:  # dot_product / scaled_dot_product
             self.register_parameter('weight', None)
         self.reset_parameters()
@@ -82,7 +82,7 @@ class Attention(nn.Cell):
             raise RuntimeError('invalid score_function')
         score = mindspore.ops.softmax(score, axis=-1)
         output = mindspore.ops.bmm(score, kx)  # (n_head*?, q_len, hidden_dim)
-        output = mindspore.ops.cat(mindspore.ops.split(output, mb_size, axis=0), dim=-1)  # (?, q_len, n_head*hidden_dim)
+        output = mindspore.ops.cat(mindspore.ops.split(output, mb_size, axis=0), axis=-1)  # (?, q_len, n_head*hidden_dim)
         output = self.proj(output)  # (?, q_len, out_dim)
         output = self.dropout(output)
         return output, score
@@ -93,14 +93,14 @@ class NoQueryAttention(Attention):
     def __init__(self, embed_dim, hidden_dim=None, out_dim=None, n_head=1, score_function='dot_product', q_len=1, dropout=0):
         super(NoQueryAttention, self).__init__(embed_dim, hidden_dim, out_dim, n_head, score_function, dropout)
         self.q_len = q_len
-        self.q = nn.Parameter(mindspore.tensor(q_len, embed_dim))
+        self.q = mindspore.Parameter(mindspore.numpy.randn((q_len, embed_dim), dtype=mindspore.float32))
         self.reset_q()
 
     def reset_q(self):
         stdv = 1. / math.sqrt(self.embed_dim)
-        self.q.data.uniform_(-stdv, stdv)
+        mindspore.ops.uniform(self.q.data, mindspore.tensor(-stdv, mindspore.float32), mindspore.tensor(stdv, mindspore.float32))
 
     def construct(self, k, **kwargs):
         mb_size = k.shape[0]
         q = self.q.expand(mb_size, -1, -1)
-        return super(NoQueryAttention, self).forward(k, q)
+        return super(NoQueryAttention, self).construct(k, q)

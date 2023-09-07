@@ -36,7 +36,6 @@ class Absolute_Position_Embedding(mindspore.nn.Cell):
 class TNet_LF(mindspore.nn.Cell):
     def __init__(self, embedding_matrix, opt):
         super(TNet_LF, self).__init__()
-        print("this is TNet_LF model")
         rows, cols = embedding_matrix.shape
         self.embed = mindspore.nn.Embedding(rows, cols, embedding_table=mindspore.tensor(embedding_matrix, dtype=mindspore.float32))
         self.position = Absolute_Position_Embedding(opt)
