@@ -1,7 +1,4 @@
-import torch
-import torch.nn as nn
-
-import torch.nn.functional as F
+import numpy as np
 import numpy
 from layers.dynamic_rnn import DynamicLSTM
 import mindspore
@@ -15,8 +12,8 @@ class Absolute_Position_Embedding(mindspore.nn.Cell):
 
     def construct(self, x, pos_inx):
         if (self.size is None) or (self.mode == 'sum'):
-            self.size = int(x.size(-1))
-        batch_size, seq_len = x.size()[0], x.size()[1]
+            self.size = int(x.shape[-1])
+        batch_size, seq_len = x.shape[0], x.shape[1]
         weight = self.weight_matrix(pos_inx, batch_size, seq_len)
         x = weight.unsqueeze(2) * x
         return x
@@ -24,7 +21,7 @@ class Absolute_Position_Embedding(mindspore.nn.Cell):
 
 
     def weight_matrix(self, pos_inx, batch_size, seq_len):
-        pos_inx = pos_inx.cpu().numpy()
+        pos_inx = pos_inx.numpy()
         weight = [[] for i in range(batch_size)]
         for i in range(batch_size):
             for j in range(pos_inx[i][1]):
@@ -33,14 +30,15 @@ class Absolute_Position_Embedding(mindspore.nn.Cell):
             for j in range(pos_inx[i][1], seq_len):
                 relative_pos = j - pos_inx[i][0]
                 weight[i].append(1 - relative_pos / 40)
-        weight = mindspore.tensor(weight)
+        weight = mindspore.tensor(weight, dtype=mindspore.float32)
         return weight
 
 class TNet_LF(mindspore.nn.Cell):
     def __init__(self, embedding_matrix, opt):
         super(TNet_LF, self).__init__()
         print("this is TNet_LF model")
-        self.embed = nn.Embedding.from_pretrained(mindspore.tensor(embedding_matrix, dtype=ms.float32))
+        rows, cols = embedding_matrix.shape
+        self.embed = mindspore.nn.Embedding(rows, cols, embedding_table=mindspore.tensor(embedding_matrix, dtype=mindspore.float32))
         self.position = Absolute_Position_Embedding(opt)
         self.opt = opt
         D = opt.embed_dim  # 模型词向量维度
@@ -49,29 +47,33 @@ class TNet_LF(mindspore.nn.Cell):
         HD = opt.hidden_dim
         self.lstm1 = DynamicLSTM(opt.embed_dim, opt.hidden_dim, num_layers=1, batch_first=True, bidirectional=True)
         self.lstm2 = DynamicLSTM(opt.embed_dim, opt.hidden_dim, num_layers=1, batch_first=True, bidirectional=True)
-        self.convs3 = mindspore.nn.Conv1d(2 * HD, 50, 3, padding=1)
+        self.convs3 = mindspore.nn.Conv1d(2 * HD, 50, 3, padding=1, pad_mode='pad', has_bias=True)
         self.fc1 = mindspore.nn.Dense(4 * HD, 2 * HD)
         self.fc = mindspore.nn.Dense(50, C)
 
     def construct(self, inputs):
         text_raw_indices, aspect_indices, aspect_in_text = inputs[0], inputs[1], inputs[2]
-        feature_len = mindspore.ops.sum(text_raw_indices != 0, dim=-1)
-        aspect_len = mindspore.ops.sum(aspect_indices != 0, dim=-1)
+        t_1 = mindspore.tensor(np.array(text_raw_indices) != 0, mindspore.int32)
+        feature_len = mindspore.ops.sum(t_1, dim=-1)
+        t_2 = mindspore.tensor(np.array(aspect_indices) != 0, mindspore.int32)
+        aspect_len = mindspore.ops.sum(t_2, dim=-1)
         feature = self.embed(text_raw_indices)
         aspect = self.embed(aspect_indices)
         v, (_, _) = self.lstm1(feature, feature_len)
         e, (_, _) = self.lstm2(aspect, aspect_len)
-        v = v.transpose(1, 2)
-        e = e.transpose(1, 2)
+        v = mindspore.ops.swapaxes(v, 1, 2)
+        e = mindspore.ops.swapaxes(e, 1, 2)
         for i in range(2):
-            a = torch.bmm(e.transpose(1, 2), v)
+            a = mindspore.ops.bmm(mindspore.ops.swapaxes(e, 1, 2), v)
             a = mindspore.ops.softmax(a, 1)  # (aspect_len,context_len)
-            aspect_mid = torch.bmm(e, a)
-            aspect_mid = mindspore.ops.cat((aspect_mid, v), dim=1).transpose(1, 2)
-            aspect_mid = F.relu(self.fc1(aspect_mid).transpose(1, 2))
+            aspect_mid = mindspore.ops.bmm(e, a)
+            aspect_mid = mindspore.ops.cat((aspect_mid, v), axis=1)
+            aspect_mid = mindspore.ops.swapaxes(aspect_mid, 1, 2)
+            aspect_mid = mindspore.ops.relu(mindspore.ops.swapaxes(self.fc1(aspect_mid), 1, 2))
             v = aspect_mid + v
-            v = self.position(v.transpose(1, 2), aspect_in_text).transpose(1, 2)
-        z = F.relu(self.convs3(v))  # [(N,Co,L), ...]*len(Ks)
-        z = F.max_pool1d(z, z.size(2)).squeeze(2)
+            v = self.position(mindspore.ops.swapaxes(v, 1, 2), aspect_in_text)
+            v = mindspore.ops.swapaxes(v, 1, 2)
+        z = mindspore.ops.relu(self.convs3(v))  # [(N,Co,L), ...]*len(Ks)
+        z = mindspore.nn.MaxPool1d(z.shape[2])(z).squeeze(2)
         out = self.fc(z)
         return out

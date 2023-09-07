@@ -14,7 +14,7 @@ class AOA(mindspore.nn.Cell):
         self.opt = opt
         assert mindspore.tensor(embedding_matrix).dim() == 2
         rows, cols = embedding_matrix.shape
-        self.embed = mindspore.nn.Embedding(rows, cols, embedding_table=mindspore.tensor(embedding_matrix))
+        self.embed = mindspore.nn.Embedding(rows, cols, embedding_table=mindspore.tensor(embedding_matrix, dtype=mindspore.float32))
         self.embed.embedding_table.requires_grad = False
         self.ctx_lstm = DynamicLSTM(opt.embed_dim, opt.hidden_dim, num_layers=1, batch_first=True, bidirectional=True)
         self.asp_lstm = DynamicLSTM(opt.embed_dim, opt.hidden_dim, num_layers=1, batch_first=True, bidirectional=True)
