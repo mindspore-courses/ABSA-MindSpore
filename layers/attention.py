@@ -3,13 +3,14 @@
 # author: songyouwei <youwei0314@gmail.com>
 # Copyright (C) 2018. All Rights Reserved.
 
+import numpy as np
 import math
 import mindspore
 import mindspore.nn as nn
 
 
 class Attention(nn.Cell):
-    def __init__(self, embed_dim, hidden_dim=None, out_dim=None, n_head=1, score_function='dot_product', dropout=0):
+    def __init__(self, embed_dim, hidden_dim=None, out_dim=None, n_head=1, score_function='dot_product', dropout=0, name='w'):
         ''' Attention Mechanism
         :param embed_dim:
         :param hidden_dim:
@@ -25,6 +26,7 @@ class Attention(nn.Cell):
             out_dim = embed_dim
         self.embed_dim = embed_dim
         self.hidden_dim = int(hidden_dim)
+        stdv = 1. / math.sqrt(self.hidden_dim)
         self.n_head = n_head
         self.score_function = score_function
         self.w_k = mindspore.nn.Dense(embed_dim, n_head * hidden_dim)
@@ -32,17 +34,11 @@ class Attention(nn.Cell):
         self.proj = mindspore.nn.Dense(n_head * hidden_dim, out_dim)
         self.dropout = mindspore.nn.Dropout(p=dropout)
         if score_function == 'mlp':
-            self.weight = mindspore.Parameter(mindspore.numpy.randn((hidden_dim*2), dtype=mindspore.float32))
+            self.weight = mindspore.Parameter(mindspore.ops.uniform((hidden_dim*2), mindspore.tensor(-stdv, mindspore.float32), mindspore.tensor(stdv, mindspore.float32)), name=name)
         elif self.score_function == 'bi_linear':
-            self.weight = mindspore.Parameter(mindspore.numpy.randn((hidden_dim, hidden_dim), dtype=mindspore.float32))
+            self.weight = mindspore.Parameter(mindspore.ops.uniform((hidden_dim, hidden_dim), mindspore.tensor(-stdv, mindspore.float32), mindspore.tensor(stdv, mindspore.float32)), name=name)
         else:  # dot_product / scaled_dot_product
             self.register_parameter('weight', None)
-        self.reset_parameters()
-
-    def reset_parameters(self):
-        stdv = 1. / math.sqrt(self.hidden_dim)
-        if self.weight is not None:
-            mindspore.ops.uniform(self.weight.data, mindspore.tensor(-stdv, mindspore.float32), mindspore.tensor(stdv, mindspore.float32))
 
     def construct(self, k, q):
         if len(q.shape) == 2:  # q_len missing
@@ -59,9 +55,9 @@ class Attention(nn.Cell):
         # score: (n_head*?, q_len, k_len,)
         # output: (?, q_len, out_dim,)
         kx = self.w_k(k).view(mb_size, k_len, self.n_head, self.hidden_dim)
-        kx = kx.permute(2, 0, 1, 3).contiguous().view(-1, k_len, self.hidden_dim)
+        kx = kx.permute(2, 0, 1, 3).view(-1, k_len, self.hidden_dim)
         qx = self.w_q(q).view(mb_size, q_len, self.n_head, self.hidden_dim)
-        qx = qx.permute(2, 0, 1, 3).contiguous().view(-1, q_len, self.hidden_dim)
+        qx = qx.permute(2, 0, 1, 3).view(-1, q_len, self.hidden_dim)
         if self.score_function == 'dot_product':
             kt = kx.permute(0, 2, 1)
             score = mindspore.ops.bmm(qx, kt)
@@ -93,12 +89,8 @@ class NoQueryAttention(Attention):
     def __init__(self, embed_dim, hidden_dim=None, out_dim=None, n_head=1, score_function='dot_product', q_len=1, dropout=0):
         super(NoQueryAttention, self).__init__(embed_dim, hidden_dim, out_dim, n_head, score_function, dropout)
         self.q_len = q_len
-        self.q = mindspore.Parameter(mindspore.numpy.randn((q_len, embed_dim), dtype=mindspore.float32))
-        self.reset_q()
-
-    def reset_q(self):
         stdv = 1. / math.sqrt(self.embed_dim)
-        mindspore.ops.uniform(self.q.data, mindspore.tensor(-stdv, mindspore.float32), mindspore.tensor(stdv, mindspore.float32))
+        self.q = mindspore.Parameter(mindspore.ops.uniform((q_len, embed_dim), mindspore.tensor(-stdv, mindspore.float32), mindspore.tensor(stdv, mindspore.float32)))     
 
     def construct(self, k, **kwargs):
         mb_size = k.shape[0]
