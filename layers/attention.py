@@ -34,7 +34,7 @@ class Attention(nn.Cell):
         self.proj = mindspore.nn.Dense(n_head * hidden_dim, out_dim)
         self.dropout = mindspore.nn.Dropout(p=dropout)
         if score_function == 'mlp':
-            self.weight = mindspore.Parameter(mindspore.ops.uniform((hidden_dim*2), mindspore.tensor(-stdv, mindspore.float32), mindspore.tensor(stdv, mindspore.float32)), name=name)
+            self.weight = mindspore.Parameter(mindspore.ops.uniform((hidden_dim*2, ), mindspore.tensor(-stdv, mindspore.float32), mindspore.tensor(stdv, mindspore.float32)), name=name)
         elif self.score_function == 'bi_linear':
             self.weight = mindspore.Parameter(mindspore.ops.uniform((hidden_dim, hidden_dim), mindspore.tensor(-stdv, mindspore.float32), mindspore.tensor(stdv, mindspore.float32)), name=name)
         else:  # dot_product / scaled_dot_product
@@ -66,8 +66,8 @@ class Attention(nn.Cell):
             qkt = mindspore.ops.bmm(qx, kt)
             score = mindspore.ops.div(qkt, math.sqrt(self.hidden_dim))
         elif self.score_function == 'mlp':
-            kxx = mindspore.ops.unsqueeze(kx, dim=1).expand(-1, q_len, -1, -1)
-            qxx = mindspore.ops.unsqueeze(qx, dim=2).expand(-1, -1, k_len, -1)
+            kxx = mindspore.ops.unsqueeze(kx, dim=1).broadcast_to((-1, q_len, -1, -1))
+            qxx = mindspore.ops.unsqueeze(qx, dim=2).broadcast_to((-1, -1, k_len, -1))
             kq = mindspore.ops.cat((kxx, qxx), axis=-1)  # (n_head*?, q_len, k_len, hidden_dim*2)
             score = mindspore.ops.tanh(mindspore.ops.matmul(kq, self.weight))
         elif self.score_function == 'bi_linear':
@@ -94,5 +94,5 @@ class NoQueryAttention(Attention):
 
     def construct(self, k, **kwargs):
         mb_size = k.shape[0]
-        q = self.q.expand(mb_size, -1, -1)
+        q = self.q.broadcast_to((mb_size, -1, -1))
         return super(NoQueryAttention, self).construct(k, q)

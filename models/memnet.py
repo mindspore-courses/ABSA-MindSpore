@@ -4,8 +4,8 @@
 # Copyright (C) 2018. All Rights Reserved.
 
 from layers.attention import Attention
-import torch
-import torch.nn as nn
+from layers.squeeze_embedding import SqueezeEmbedding
+import numpy as np
 import mindspore
 
 
@@ -15,7 +15,7 @@ class MemNet(mindspore.nn.Cell):
         # here we just simply calculate the location vector in Model2's manner
         batch_size = memory.shape[0]
         seq_len = memory.shape[1]
-        memory_len = memory_len.cpu().numpy()
+        memory_len = memory_len.numpy()
         weight = [[] for i in range(batch_size)]
         for i in range(batch_size):
             for idx in range(memory_len[i]):
@@ -29,7 +29,8 @@ class MemNet(mindspore.nn.Cell):
     def __init__(self, embedding_matrix, opt):
         super(MemNet, self).__init__()
         self.opt = opt
-        self.embed = nn.Embedding.from_pretrained(mindspore.tensor(embedding_matrix, dtype=ms.float32))
+        rows, cols = embedding_matrix.shape
+        self.embed = mindspore.nn.Embedding(rows, cols, embedding_table=mindspore.tensor(embedding_matrix, dtype=mindspore.float32))
         self.squeeze_embedding = SqueezeEmbedding(batch_first=True)
         self.attention = Attention(opt.embed_dim, score_function='mlp')
         self.x_linear = mindspore.nn.Dense(opt.embed_dim, opt.embed_dim)
@@ -37,21 +38,23 @@ class MemNet(mindspore.nn.Cell):
 
     def construct(self, inputs):
         text_raw_without_aspect_indices, aspect_indices = inputs[0], inputs[1]
-        memory_len = mindspore.ops.sum(text_raw_without_aspect_indices != 0, dim=-1)
-        aspect_len = mindspore.ops.sum(aspect_indices != 0, dim=-1)
-        nonzeros_aspect = mindspore.tensor(aspect_len, dtype=ms.float32)
+        t_1 = mindspore.tensor(np.array(text_raw_without_aspect_indices) != 0, mindspore.int32)
+        memory_len = mindspore.ops.sum(t_1, dim=-1)
+        t_2 = mindspore.tensor(np.array(aspect_indices) != 0, mindspore.int32)
+        aspect_len = mindspore.ops.sum(t_2, dim=-1)
+        nonzeros_aspect = mindspore.tensor(aspect_len, dtype=mindspore.float32)
 
         memory = self.embed(text_raw_without_aspect_indices)
         memory = self.squeeze_embedding(memory, memory_len)
         # memory = self.locationed_memory(memory, memory_len)
         aspect = self.embed(aspect_indices)
         aspect = mindspore.ops.sum(aspect, dim=1)
-        aspect = mindspore.ops.div(aspect, nonzeros_aspect.view(nonzeros_aspect.size(0), 1))
-        x = aspect.unsqueeze(dim=1)
+        aspect = mindspore.ops.div(aspect, nonzeros_aspect.view(nonzeros_aspect.shape[0], 1))
+        x = aspect.unsqueeze(1)
         for _ in range(self.opt.hops):
             x = self.x_linear(x)
             out_at, _ = self.attention(memory, x)
             x = out_at + x
-        x = x.view(x.size(0), -1)
+        x = x.view(x.shape[0], -1)
         out = self.dense(x)
         return out
