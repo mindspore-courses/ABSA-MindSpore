@@ -4,10 +4,8 @@
 # Copyright (C) 2018. All Rights Reserved.
 
 from layers.attention import Attention
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
 import mindspore
+import numpy as np
 from layers.squeeze_embedding import SqueezeEmbedding
 from layers.dynamic_rnn import DynamicLSTM         
 
@@ -16,10 +14,11 @@ class Cabasc(mindspore.nn.Cell):
         super(Cabasc, self).__init__()
         self.opt = opt
         self.type = _type
-        self.embed = nn.Embedding.from_pretrained(mindspore.tensor(embedding_matrix, dtype=ms.float32))
+        rows, cols = embedding_matrix.shape
+        self.embed = mindspore.nn.Embedding(rows, cols, embedding_table=mindspore.tensor(embedding_matrix, dtype=mindspore.float32))
         self.squeeze_embedding = SqueezeEmbedding(batch_first=True)
         self.linear1 = mindspore.nn.Dense(3*opt.embed_dim, opt.embed_dim)
-        self.linear2 = mindspore.nn.Dense(opt.embed_dim, 1, bias=False)     
+        self.linear2 = mindspore.nn.Dense(opt.embed_dim, 1, has_bias=False)     
         self.mlp = mindspore.nn.Dense(opt.embed_dim, opt.embed_dim)                           
         self.dense = mindspore.nn.Dense(opt.embed_dim, opt.polarities_dim)                    
         # context attention layer
@@ -39,11 +38,11 @@ class Cabasc(mindspore.nn.Cell):
         
         # Attention weights : (batch_size, max_batch_len, 1) 
         # 0.5 should be a variable according to the paper
-        attn_l = torch.sigmoid(self.mlp_l(context_l)) + 0.5
-        attn_r = torch.sigmoid(self.mlp_r(context_r)) + 0.5
+        attn_l = mindspore.ops.sigmoid(self.mlp_l(context_l)) + 0.5
+        attn_r = mindspore.ops.sigmoid(self.mlp_r(context_r)) + 0.5
         
         # apply weights one sample at a time
-        for i in range(memory.size(0)): 
+        for i in range(memory.shape[0]): 
             aspect_start = (left_len[i] - aspect_len[i]).item()
             aspect_end = left_len[i] 
             # attention weights for each element in the sentence
@@ -67,7 +66,7 @@ class Cabasc(mindspore.nn.Cell):
                 else: l = idx - aspect_end.item()
                 memory[i][idx] *= (1-float(l)/int(memory_len[i]))
         '''
-        for i in range(memory.size(0)):
+        for i in range(memory.shape[0]):
             for idx in range(memory_len[i]):
                 memory[i][idx] *= (1-float(idx)/int(memory_len[i]))
                
@@ -76,8 +75,10 @@ class Cabasc(mindspore.nn.Cell):
     def construct(self, inputs):
         # inputs
         text_raw_indices, aspect_indices, x_l, x_r = inputs[0], inputs[1], inputs[2], inputs[3]
-        memory_len = mindspore.ops.sum(text_raw_indices != 0, dim = -1)
-        aspect_len = mindspore.ops.sum(aspect_indices != 0, dim = -1)
+        t_1 = mindspore.tensor(np.array(text_raw_indices) != 0, mindspore.int32)
+        memory_len = mindspore.ops.sum(t_1, dim = -1)
+        t_2 = mindspore.tensor(np.array(aspect_indices) != 0, mindspore.int32)
+        aspect_len = mindspore.ops.sum(t_2, dim = -1)
         
         # aspect representation
         nonzeros_aspect = aspect_len.float()
@@ -103,7 +104,7 @@ class Cabasc(mindspore.nn.Cell):
             # recalculate sentence rep with new memory
             v_s = mindspore.ops.sum(memory, dim = 1)                                             
             v_s = mindspore.ops.div(v_s, nonzeros_memory.unsqueeze(1))  
-            v_s = v_s.unsqueeze(dim=1)
+            v_s = v_s.unsqueeze(1)
         
         
         '''
@@ -113,19 +114,19 @@ class Cabasc(mindspore.nn.Cell):
             #x = self.x_linear(x)
             v_ts, _ = self.attention(memory, v_a)
         '''
-        memory_chunks = memory.chunk(memory.size(1), dim=1)
+        memory_chunks = memory.chunk(memory.shape[1], dim=1)
         c = []
         for memory_chunk in memory_chunks: # batch_size x 1 x embed_dim
-            c_i = self.linear1(mindspore.ops.cat([memory_chunk, v_a, v_s], dim=1).view(memory_chunk.size(0), -1))
-            c_i = self.linear2(torch.tanh(c_i)) # batch_size x 1
+            c_i = self.linear1(mindspore.ops.cat([memory_chunk, v_a, v_s], axis=1).view(memory_chunk.shape[0], -1))
+            c_i = self.linear2(mindspore.ops.tanh(c_i)) # batch_size x 1
             c.append(c_i)
-        alpha = mindspore.ops.softmax(mindspore.ops.cat(c, dim=1), axis=1) # batch_size x seq_len
+        alpha = mindspore.ops.softmax(mindspore.ops.cat(c, axis=1), axis=1) # batch_size x seq_len
         v_ts = mindspore.ops.matmul(memory.transpose(1, 2), alpha.unsqueeze(-1)).transpose(1, 2)
        
         # classifier
         v_ns = v_ts + v_s                                 # embedd the sentence
         v_ns = v_ns.view(v_ns.size(0), -1)
-        v_ms = torch.tanh(self.mlp(v_ns))
+        v_ms = mindspore.ops.tanh(self.mlp(v_ns))
         out = self.dense(v_ms)   
         
         return out
