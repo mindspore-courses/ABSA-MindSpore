@@ -15,7 +15,6 @@ class CrossEntropyLoss_LSR(mindspore.nn.Cell):
     def __init__(self, device, para_LSR=0.2):
         super(CrossEntropyLoss_LSR, self).__init__()
         self.para_LSR = para_LSR
-        self.device = device
         self.logSoftmax = mindspore.nn.LogSoftMax(dim=-1)
 
     def _toOneHot_smooth(self, label, batchsize, classes):
@@ -27,8 +26,8 @@ class CrossEntropyLoss_LSR(mindspore.nn.Cell):
         return one_hot_label
 
     def construct(self, pre, label, size_average=True):
-        b, c = pre.size()
-        one_hot_label = self._toOneHot_smooth(label, b, c).to(self.device)
+        b, c = pre.shape
+        one_hot_label = self._toOneHot_smooth(label, b, c)
         loss = mindspore.ops.sum(-one_hot_label * self.logSoftmax(pre), dim=1)
         if size_average:
             return mindspore.ops.mean(loss)
@@ -79,6 +78,6 @@ class AEN_BERT(mindspore.nn.Cell):
         ht_mean = mindspore.ops.div(mindspore.ops.sum(ht, dim=1), target_len.unsqueeze(1).float())
         s1_mean = mindspore.ops.div(mindspore.ops.sum(s1, dim=1), context_len.unsqueeze(1).float())
 
-        x = mindspore.ops.cat((hc_mean, s1_mean, ht_mean), dim=-1)
+        x = mindspore.ops.cat((hc_mean, s1_mean, ht_mean), axis=-1)
         out = self.dense(x)
         return out

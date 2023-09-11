@@ -15,7 +15,7 @@ import argparse
 
 from sklearn import metrics
 from time import strftime, localtime
-from transformers import BertModel
+from mindnlp.models import BertModel
 
 import mindspore
 import mindspore.nn as nn
@@ -37,7 +37,7 @@ class Instructor:
         
         if 'bert' in opt.model_name:
             tokenizer = Tokenizer4Bert(opt.max_seq_len, opt.pretrained_bert_name)
-            bert = BertModel.from_pretrained(opt.pretrained_bert_name, return_dict=False)
+            bert = BertModel.from_pretrained(opt.pretrained_bert_name)
             self.model = opt.model_class(bert, opt)
         else:
             tokenizer = build_tokenizer(
@@ -145,7 +145,7 @@ class Instructor:
 def main():
     # Hyper Parameters
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model_name', default='atae_lstm', type=str)
+    parser.add_argument('--model_name', default='aen_bert', type=str)
     parser.add_argument('--dataset', default='restaurant', type=str, help='twitter, restaurant, laptop')
     parser.add_argument('--optimizer', default='adam', type=str)
     parser.add_argument('--initializer', default='xavier_uniform_', type=str)
@@ -158,7 +158,7 @@ def main():
     parser.add_argument('--embed_dim', default=300, type=int)
     parser.add_argument('--hidden_dim', default=300, type=int)
     parser.add_argument('--bert_dim', default=768, type=int)
-    parser.add_argument('--pretrained_bert_name', default='bert-base-uncased', type=str)
+    parser.add_argument('--pretrained_bert_name', default='bert-base-cased.json', type=str)
     parser.add_argument('--max_seq_len', default=85, type=int)
     parser.add_argument('--polarities_dim', default=3, type=int)
     parser.add_argument('--hops', default=3, type=int)
