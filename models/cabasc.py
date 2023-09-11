@@ -114,18 +114,19 @@ class Cabasc(mindspore.nn.Cell):
             #x = self.x_linear(x)
             v_ts, _ = self.attention(memory, v_a)
         '''
-        memory_chunks = memory.chunk(memory.shape[1], dim=1)
+        memory_chunks = memory.chunk(memory.shape[1], axis=1)
         c = []
         for memory_chunk in memory_chunks: # batch_size x 1 x embed_dim
             c_i = self.linear1(mindspore.ops.cat([memory_chunk, v_a, v_s], axis=1).view(memory_chunk.shape[0], -1))
             c_i = self.linear2(mindspore.ops.tanh(c_i)) # batch_size x 1
             c.append(c_i)
         alpha = mindspore.ops.softmax(mindspore.ops.cat(c, axis=1), axis=1) # batch_size x seq_len
-        v_ts = mindspore.ops.matmul(memory.transpose(1, 2), alpha.unsqueeze(-1)).transpose(1, 2)
+        v_ts = mindspore.ops.matmul(mindspore.ops.swapaxes(memory, 1, 2), alpha.unsqueeze(-1))
+        v_ts = mindspore.ops.swapaxes(v_ts, 1, 2)
        
         # classifier
         v_ns = v_ts + v_s                                 # embedd the sentence
-        v_ns = v_ns.view(v_ns.size(0), -1)
+        v_ns = v_ns.view(v_ns.shape[0], -1)
         v_ms = mindspore.ops.tanh(self.mlp(v_ns))
         out = self.dense(v_ms)   
         

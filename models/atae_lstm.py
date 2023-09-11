@@ -4,8 +4,7 @@
 # Copyright (C) 2018. All Rights Reserved.
 from layers.attention import Attention, NoQueryAttention
 from layers.dynamic_rnn import DynamicLSTM
-import torch
-import torch.nn as nn
+import numpy as np
 import mindspore
 from layers.squeeze_embedding import SqueezeEmbedding
 
@@ -23,21 +22,21 @@ class ATAE_LSTM(mindspore.nn.Cell):
 
     def construct(self, inputs):
         text_indices, aspect_indices = inputs[0], inputs[1]
-        x_len = mindspore.ops.sum(text_indices != 0, dim=-1)
-        x_len_max = torch.max(x_len)
+        t_1 = mindspore.tensor(np.array(text_indices) != 0, mindspore.int32)
+        x_len = mindspore.ops.sum(t_1, dim=-1)
         aspect_len = mindspore.ops.sum(aspect_indices != 0, dim=-1).float()
 
         x = self.embed(text_indices)
         x = self.squeeze_embedding(x, x_len)
         aspect = self.embed(aspect_indices)
         aspect_pool = mindspore.ops.div(mindspore.ops.sum(aspect, dim=1), aspect_len.unsqueeze(1))
-        aspect = aspect_pool.unsqueeze(1).expand(-1, x_len_max, -1)
-        x = mindspore.ops.cat((aspect, x), dim=-1)
+        aspect = aspect_pool.unsqueeze(1).broadcast_to((-1, 85, -1))
+        x = mindspore.ops.cat((aspect, x), axis=-1)
 
         h, (_, _) = self.lstm(x, x_len)
-        ha = mindspore.ops.cat((h, aspect), dim=-1)
+        ha = mindspore.ops.cat((h, aspect), axis=-1)
         _, score = self.attention(ha)
-        output = torch.squeeze(torch.bmm(score, h), dim=1)
+        output = mindspore.ops.squeeze(mindspore.ops.bmm(score, h), axis=1)
 
         out = self.dense(output)
         return out
