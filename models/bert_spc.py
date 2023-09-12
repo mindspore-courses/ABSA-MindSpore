@@ -10,7 +10,7 @@ class BERT_SPC(mindspore.nn.Cell):
     def __init__(self, bert, opt):
         super(BERT_SPC, self).__init__()
         self.bert = bert
-        self.dropout = mindspore.nn.Dropout(opt.dropout)
+        self.dropout = mindspore.nn.Dropout(p=opt.dropout)
         self.dense = mindspore.nn.Dense(opt.bert_dim, opt.polarities_dim)
 
     def construct(self, inputs):

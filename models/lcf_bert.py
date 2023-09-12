@@ -7,12 +7,10 @@
 # The code is based on repository: https://github.com/yangheng95/LCF-ABSA
 
 
-import torch
-import torch.nn as nn
 import copy
 import numpy as np
 import mindspore
-from transformers.models.bert.modeling_bert import BertPooler, BertSelfAttention
+from mindnlp.models.bert.bert import BertPooler, BertSelfAttention
 
 
 class SelfAttention(mindspore.nn.Cell):
@@ -21,11 +19,11 @@ class SelfAttention(mindspore.nn.Cell):
         self.opt = opt
         self.config = config
         self.SA = BertSelfAttention(config)
-        self.tanh = torch.nn.Tanh()
+        self.tanh = mindspore.nn.Tanh()
 
     def construct(self, inputs):
-        zero_tensor = mindspore.tensor(np.zeros((inputs.size(0), 1, 1, self.opt.max_seq_len),
-                                            dtype=np.float32), dtype=torch.float32)
+        zero_tensor = mindspore.tensor(np.zeros((inputs.shape[0], 1, 1, self.opt.max_seq_len),
+                                            dtype=np.float32), dtype=mindspore.float32)
         SA_out = self.SA(inputs, zero_tensor)
         return self.tanh(SA_out[0])
 
@@ -37,7 +35,7 @@ class LCF_BERT(mindspore.nn.Cell):
         self.opt = opt
         # self.bert_local = copy.deepcopy(bert)  # Uncomment the line to use dual Bert
         self.bert_local = bert   # Default to use single Bert and reduce memory requirements
-        self.dropout = mindspore.nn.Dropout(opt.dropout)
+        self.dropout = mindspore.nn.Dropout(p=opt.dropout)
         self.bert_SA = SelfAttention(bert.config, opt)
         self.linear_double = mindspore.nn.Dense(opt.bert_dim * 2, opt.bert_dim)
         self.linear_single = mindspore.nn.Dense(opt.bert_dim, opt.bert_dim)
@@ -45,10 +43,10 @@ class LCF_BERT(mindspore.nn.Cell):
         self.dense = mindspore.nn.Dense(opt.bert_dim, opt.polarities_dim)
 
     def feature_dynamic_mask(self, text_local_indices, aspect_indices):
-        texts = text_local_indices.cpu().numpy()
-        asps = aspect_indices.cpu().numpy()
+        texts = text_local_indices.numpy()
+        asps = aspect_indices.numpy()
         mask_len = self.opt.SRD
-        masked_text_raw_indices = np.ones((text_local_indices.size(0), self.opt.max_seq_len, self.opt.bert_dim),
+        masked_text_raw_indices = np.ones((text_local_indices.shape[0], self.opt.max_seq_len, self.opt.bert_dim),
                                           dtype=np.float32)
         for text_i, asp_i in zip(range(len(texts)), range(len(asps))):
             asp_len = np.count_nonzero(asps[asp_i]) - 2
@@ -64,13 +62,13 @@ class LCF_BERT(mindspore.nn.Cell):
                 masked_text_raw_indices[text_i][i] = np.zeros((self.opt.bert_dim), dtype=np.float)
             for j in range(asp_begin + asp_len + mask_len, self.opt.max_seq_len):
                 masked_text_raw_indices[text_i][j] = np.zeros((self.opt.bert_dim), dtype=np.float)
-        masked_text_raw_indices = torch.from_numpy(masked_text_raw_indices)
+        masked_text_raw_indices = mindspore.Tensor.from_numpy(masked_text_raw_indices)
         return masked_text_raw_indices
 
     def feature_dynamic_weighted(self, text_local_indices, aspect_indices):
-        texts = text_local_indices.cpu().numpy()
-        asps = aspect_indices.cpu().numpy()
-        masked_text_raw_indices = np.ones((text_local_indices.size(0), self.opt.max_seq_len, self.opt.bert_dim),
+        texts = text_local_indices.numpy()
+        asps = aspect_indices.numpy()
+        masked_text_raw_indices = np.ones((text_local_indices.shape[0], self.opt.max_seq_len, self.opt.bert_dim),
                                           dtype=np.float32)
         for text_i, asp_i in zip(range(len(texts)), range(len(asps))):
             asp_len = np.count_nonzero(asps[asp_i]) - 2
@@ -88,7 +86,7 @@ class LCF_BERT(mindspore.nn.Cell):
                     distances[i] = 1
             for i in range(len(distances)):
                 masked_text_raw_indices[text_i][i] = masked_text_raw_indices[text_i][i] * distances[i]
-        masked_text_raw_indices = torch.from_numpy(masked_text_raw_indices)
+        masked_text_raw_indices = mindspore.Tensor.from_numpy(masked_text_raw_indices)
         return masked_text_raw_indices
 
     def construct(self, inputs):
@@ -105,13 +103,13 @@ class LCF_BERT(mindspore.nn.Cell):
 
         if self.opt.local_context_focus == 'cdm':
             masked_local_text_vec = self.feature_dynamic_mask(text_local_indices, aspect_indices)
-            bert_local_out = torch.mul(bert_local_out, masked_local_text_vec)
+            bert_local_out = mindspore.ops.mul(bert_local_out, masked_local_text_vec)
 
         elif self.opt.local_context_focus == 'cdw':
             weighted_text_local_features = self.feature_dynamic_weighted(text_local_indices, aspect_indices)
-            bert_local_out = torch.mul(bert_local_out, weighted_text_local_features)
+            bert_local_out = mindspore.ops.mul(bert_local_out, weighted_text_local_features)
 
-        out_cat = mindspore.ops.cat((bert_local_out, bert_spc_out), dim=-1)
+        out_cat = mindspore.ops.cat((bert_local_out, bert_spc_out), axis=-1)
         mean_pool = self.linear_double(out_cat)
         self_attention_out = self.bert_SA(mean_pool)
         pooled_out = self.bert_pooler(self_attention_out)
