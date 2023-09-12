@@ -61,7 +61,7 @@ class AEN_BERT(mindspore.nn.Cell):
         target_len = mindspore.ops.sum(t_2, dim=-1)
         context = self.squeeze_embedding(context, context_len)
         
-        context, _ = self.bert(context).to_tuple()
+        context, _ = self.bert(context)
         context = self.dropout(context)
         target = self.squeeze_embedding(target, target_len)
         target, _ = self.bert(target)

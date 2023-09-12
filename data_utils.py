@@ -110,11 +110,11 @@ class Tokenizer(object):
 class Tokenizer4Bert:
     def __init__(self, max_seq_len, pretrained_bert_name):
         os.environ['CURL_CA_BUNDLE'] = ''
-        self.tokenizer = BertTokenizer(pretrained_bert_name)
+        self.tokenizer = BertTokenizer.from_pretrained(pretrained_bert_name)
         self.max_seq_len = max_seq_len
 
     def text_to_sequence(self, text, reverse=False, padding='post', truncating='post'):
-        sequence = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(text))
+        sequence = self.tokenizer(text)
         if len(sequence) == 0:
             sequence = [0]
         if reverse:
@@ -136,7 +136,6 @@ class ABSADataset():
             text_left, _, text_right = [s.lower().strip() for s in lines[i].partition("$T$")]
             aspect = lines[i + 1].lower().strip()
             polarity = lines[i + 2].strip()
-
             text_indices = tokenizer.text_to_sequence(text_left + " " + aspect + " " + text_right)
             context_indices = tokenizer.text_to_sequence(text_left + " " + text_right)
             left_indices = tokenizer.text_to_sequence(text_left)
