@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
-# file: ram.py
-# author: songyouwei <youwei0314@gmail.com>
-# Copyright (C) 2018. All Rights Reserved.
+# The code is based on repository: https://github.com/songyouwei/ABSA-PyTorch
+# author: Runjia Zeng <rain1709@foxmail.com>
 
-from layers.dynamic_rnn import DynamicLSTM
 import mindspore
 import numpy as np
+from layers.dynamic_rnn import DynamicLSTM
 
 class RAM(mindspore.nn.Cell):
     def locationed_memory(self, memory, memory_len, left_len, aspect_len):

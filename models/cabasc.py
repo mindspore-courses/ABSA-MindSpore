@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
-# file: cabasc.py
-# author: albertopaz <aj.paz167@gmail.com>
-# Copyright (C) 2018. All Rights Reserved.
+# The code is based on repository: https://github.com/songyouwei/ABSA-PyTorch
+# author: Runjia Zeng <rain1709@foxmail.com>
 
-from layers.attention import Attention
 import mindspore
 import numpy as np
+from layers.attention import Attention
 from layers.squeeze_embedding import SqueezeEmbedding
 from layers.dynamic_rnn import DynamicLSTM         
 
@@ -106,14 +105,6 @@ class Cabasc(mindspore.nn.Cell):
             v_s = mindspore.ops.div(v_s, nonzeros_memory.unsqueeze(1))  
             v_s = v_s.unsqueeze(1)
         
-        
-        '''
-        # no multi-hop, but may be better. 
-        # however, here is something totally different from what paper depits
-        for _ in range(self.opt.hops):  
-            #x = self.x_linear(x)
-            v_ts, _ = self.attention(memory, v_a)
-        '''
         memory_chunks = memory.chunk(memory.shape[1], axis=1)
         c = []
         for memory_chunk in memory_chunks: # batch_size x 1 x embed_dim

@@ -1,17 +1,11 @@
 # -*- coding: utf-8 -*-
-# file: lcf_bert.py
-# author: yangheng <yangheng@m.scnu.edu.cn>
-# Copyright (C) 2019. All Rights Reserved.
-
-
-# The code is based on repository: https://github.com/yangheng95/LCF-ABSA
-
+# The code is based on repository: https://github.com/songyouwei/ABSA-PyTorch
+# author: Runjia Zeng <rain1709@foxmail.com>
 
 import copy
 import numpy as np
 import mindspore
 from mindnlp.models.bert.bert import BertPooler, BertSelfAttention
-
 
 class SelfAttention(mindspore.nn.Cell):
     def __init__(self, config, opt):

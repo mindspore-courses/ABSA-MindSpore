@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
-# file: mgan.py
-# author: gene_zc <gene_zhangchen@163.com>
-# Copyright (C) 2018. All Rights Reserved.
+# The code is based on repository: https://github.com/songyouwei/ABSA-PyTorch
+# author: Runjia Zeng <rain1709@foxmail.com>
 
-from layers.dynamic_rnn import DynamicLSTM
 import mindspore
 import numpy as np
+from layers.dynamic_rnn import DynamicLSTM
 
 class LocationEncoding(mindspore.nn.Cell):
     def __init__(self, opt):

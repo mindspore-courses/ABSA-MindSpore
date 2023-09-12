@@ -1,13 +1,12 @@
 # -*- coding: utf-8 -*-
-# file: atae-lstm
-# author: songyouwei <youwei0314@gmail.com>
-# Copyright (C) 2018. All Rights Reserved.
-from layers.attention import Attention, NoQueryAttention
-from layers.dynamic_rnn import DynamicLSTM
+# The code is based on repository: https://github.com/songyouwei/ABSA-PyTorch
+# author: Runjia Zeng <rain1709@foxmail.com>
+
 import numpy as np
 import mindspore
 from layers.squeeze_embedding import SqueezeEmbedding
-
+from layers.attention import Attention, NoQueryAttention
+from layers.dynamic_rnn import DynamicLSTM
 
 class ATAE_LSTM(mindspore.nn.Cell):
     def __init__(self, embedding_matrix, opt):

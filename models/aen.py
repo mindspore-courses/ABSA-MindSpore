@@ -1,14 +1,13 @@
 # -*- coding: utf-8 -*-
-# file: aen.py
-# author: songyouwei <youwei0314@gmail.com>
-# Copyright (C) 2018. All Rights Reserved.
+# The code is based on repository: https://github.com/songyouwei/ABSA-PyTorch
+# author: Runjia Zeng <rain1709@foxmail.com>
 
+import mindspore
+import numpy as np
 from layers.dynamic_rnn import DynamicLSTM
 from layers.squeeze_embedding import SqueezeEmbedding
 from layers.attention import Attention, NoQueryAttention
 from layers.point_wise_feed_forward import PositionwiseFeedForward
-import mindspore
-import numpy as np
 
 # CrossEntropyLoss for Label Smoothing Regularization
 class CrossEntropyLoss_LSR(mindspore.nn.Cell):
@@ -33,8 +32,6 @@ class CrossEntropyLoss_LSR(mindspore.nn.Cell):
             return mindspore.ops.mean(loss)
         else:
             return mindspore.ops.sum(loss)
-
-
 
 class AEN_BERT(mindspore.nn.Cell):
     def __init__(self, bert, opt):

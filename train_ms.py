@@ -1,10 +1,4 @@
 # -*- encoding: utf-8 -*-
-'''
-@File    :   train_ms.py
-@Time    :   2023/09/01 
-@Author  :   rain 
-@Mail    :   work@rainz.tech
-'''
 import os
 import sys
 import math
@@ -15,12 +9,13 @@ import argparse
 
 from sklearn import metrics
 from time import strftime, localtime
-from mindnlp.models import BertModel
 
 import mindspore
 import mindspore.nn as nn
-from mindspore.dataset import GeneratorDataset
 from mindspore import context
+from mindspore.dataset import GeneratorDataset
+
+from mindnlp.models import BertModel
 
 from data_utils import build_tokenizer, build_embedding_matrix, Tokenizer4Bert, ABSADataset
 from models import LSTM, IAN, MemNet, RAM, TD_LSTM, TC_LSTM, Cabasc, ATAE_LSTM, TNet_LF, AOA, MGAN, ASGCN, LCF_BERT
@@ -106,7 +101,7 @@ class Instructor:
     def _evaluate_acc_f1(self, data_loader):
         n_correct, n_total = 0, 0
         t_targets_all, t_outputs_all = None, None
-        # switch model to evaluation mode
+
         self.model.set_train(False)
         for i_batch, t_batch in enumerate(data_loader):
             t_inputs = [t_batch[0][col] for col in self.opt.inputs_cols]
@@ -191,11 +186,6 @@ def main():
         'bert_spc': BERT_SPC,
         'aen_bert': AEN_BERT,
         'lcf_bert': LCF_BERT,
-        # default hyper-parameters for LCF-BERT model is as follws:
-        # lr: 2e-5
-        # l2: 1e-5
-        # batch size: 16
-        # num epochs: 5
     }
     dataset_files = {
         'twitter': {

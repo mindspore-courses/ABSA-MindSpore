@@ -1,13 +1,12 @@
 # -*- coding: utf-8 -*-
-# file: asgcn.py
-# author:  <gene_zhangchen@163.com>
-# Copyright (C) 2020. All Rights Reserved.
+# The code is based on repository: https://github.com/songyouwei/ABSA-PyTorch
+# author: Runjia Zeng <rain1709@foxmail.com>
 
 import math
-from layers.dynamic_rnn import DynamicLSTM
-from mindspore import Tensor
-import mindspore
 import numpy as np
+import mindspore
+from mindspore import Tensor
+from layers.dynamic_rnn import DynamicLSTM
 
 class GraphConvolution(mindspore.nn.Cell):
     """

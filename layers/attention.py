@@ -1,13 +1,11 @@
 # -*- coding: utf-8 -*-
-# file: attention.py
-# author: songyouwei <youwei0314@gmail.com>
-# Copyright (C) 2018. All Rights Reserved.
+# The code is based on repository: https://github.com/songyouwei/ABSA-PyTorch
+# author: Runjia Zeng <rain1709@foxmail.com>
 
 import numpy as np
 import math
 import mindspore
 import mindspore.nn as nn
-
 
 class Attention(nn.Cell):
     def __init__(self, embed_dim, hidden_dim=None, out_dim=None, n_head=1, score_function='dot_product', dropout=0, name='w'):

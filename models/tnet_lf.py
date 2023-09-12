@@ -1,6 +1,9 @@
+# The code is based on repository: https://github.com/songyouwei/ABSA-PyTorch
+# author: Runjia Zeng <rain1709@foxmail.com>
 import numpy as np
 import numpy
 from layers.dynamic_rnn import DynamicLSTM
+
 import mindspore
 
 class Absolute_Position_Embedding(mindspore.nn.Cell):
@@ -17,8 +20,6 @@ class Absolute_Position_Embedding(mindspore.nn.Cell):
         weight = self.weight_matrix(pos_inx, batch_size, seq_len)
         x = weight.unsqueeze(2) * x
         return x
-
-
 
     def weight_matrix(self, pos_inx, batch_size, seq_len):
         pos_inx = pos_inx.numpy()

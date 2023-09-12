@@ -1,13 +1,11 @@
 # -*- coding: utf-8 -*-
-# file: memnet.py
-# author: songyouwei <youwei0314@gmail.com>
-# Copyright (C) 2018. All Rights Reserved.
+# The code is based on repository: https://github.com/songyouwei/ABSA-PyTorch
+# author: Runjia Zeng <rain1709@foxmail.com>
 
-from layers.attention import Attention
-from layers.squeeze_embedding import SqueezeEmbedding
 import numpy as np
 import mindspore
-
+from layers.attention import Attention
+from layers.squeeze_embedding import SqueezeEmbedding
 
 class MemNet(mindspore.nn.Cell):
     
